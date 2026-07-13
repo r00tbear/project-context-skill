@@ -1,0 +1,8 @@
+# project-context skill config for this repository
+user_level: specialist      # novice | specialist | expert
+language: en                # interview AND generated docs; the user may set any language
+project_size: medium        # small | medium | large (determined in phase 0)
+docs_dir: docs
+exclude:                    # zones the audit leaves untouched
+  - vendor/
+last_audit: null

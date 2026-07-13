@@ -1,0 +1,20 @@
+# Audit summary — default structure and health-score formula.
+# Keep the previous run's formula if one exists; comparability beats elegance.
+scanned_at: 2026-07-13
+auditors_run: [stack, architecture, ui, db, bloat, security, testing]
+findings:
+  critical: 1
+  high: 2
+  medium: 5
+  low: 4
+  security_critical: 1        # subset of the counts above
+target_structure_pct: null    # % of files matching the target structure; null until the first generate
+drift_mismatches: 0
+critical_paths_tested: "4/5"
+health_score: 43              # 100 - 25*1 - 5*2 - 2*5 - 0.5*4 - 10*1
+health_score_formula: >
+  clamp(0..100): 100 - 25*critical - 5*high - 2*medium - 0.5*low
+  - 10*untested_critical_paths + 0.2*target_structure_pct(if known)
+previous:
+  scanned_at: null
+  health_score: null
