@@ -8,3 +8,4 @@ Filled outputs for **Shelfie**, a fictional project (React SPA + Express + Postg
 - `migration-backlog.md` — one backlog item
 - `decide-question.md` — one Decide-phase question batch
 - `inventory.yaml` — audit summary with the default health-score formula
+- `greenfield-sprint.md` — the bootstrap CurrentSprint for an empty project (greenfield mode)

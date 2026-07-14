@@ -7,6 +7,8 @@ A skill for AI agents (Claude Code, Codex, Cursor) that, in an existing reposito
 4. **Verify** — checks the docs against the code, drift report.
 5. **Review** — checks a diff/PR against all the docs (architecture, stack, ui-kit, security, tests, DoD); also works as a CI quality gate. Complexity/over-engineering is [ponytail](https://github.com/DietrichGebert/ponytail)'s territory (/ponytail-review) when installed; the skill does not duplicate it.
 
+Works on empty projects too (**greenfield mode**): the audit is replaced by a requirements interview, the docs fix the chosen stack/architecture as the plan, the first sprint is the bootstrap plan, and the Review gate guards the plan from the very first PR.
+
 ## Layout
 ```
 SKILL.md                 # core: phases, rules, orchestration

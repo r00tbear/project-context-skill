@@ -1,6 +1,6 @@
 ---
 name: project-context
-description: Generate and maintain project context documentation (agents.md + techstack.md, architecture.md, db-schema.md, ui-kit.md, edge-cases.md, links.md, CurrentSprint.md, LegacyWarning.md) for an existing codebase. Runs a read-only audit with subagents, detects inconsistencies ("zoo" of frameworks, duplicated UI components, redundant hand-written code), interviews the user to pick target architecture/stack, then generates docs and a migration backlog. Use whenever the user asks to audit a project, create agents.md / CLAUDE.md context files, set up project documentation for AI agents, detect tech debt, review a diff/branch/PR against generated project docs (CI quality gate), or says "запусти project-context", "сделай аудит проекта", "создай файлы контекста", "проверь diff/PR по докам".
+description: Generate and maintain project context documentation (agents.md + techstack.md, architecture.md, db-schema.md, ui-kit.md, edge-cases.md, links.md, CurrentSprint.md, LegacyWarning.md) for an existing codebase. Runs a read-only audit with subagents, detects inconsistencies ("zoo" of frameworks, duplicated UI components, redundant hand-written code), interviews the user to pick target architecture/stack, then generates docs and a migration backlog. Use whenever the user asks to audit a project, create agents.md / CLAUDE.md context files, set up project documentation for AI agents, detect tech debt, bootstrap context docs for a new/empty project (greenfield), review a diff/branch/PR against generated project docs (CI quality gate), or says "запусти project-context", "сделай аудит проекта", "создай файлы контекста", "начни новый проект", "проверь diff/PR по докам".
 ---
 
 # Project Context — codebase audit and context-file generation
@@ -22,6 +22,7 @@ All artifacts are written to `docs/` in the project root.
 
 1. Check whether `docs/project-context.config.yaml` exists. If yes — read it and skip the questions it already answers.
 2. Determine project size (LOC, number of modules/packages):
+   - **greenfield** (no meaningful source code — an empty repo or a bare scaffold) — read `references/greenfield.md`: it replaces Phase 1 with a requirements interview and adjusts Phases 2–4; a scaffold counts as a partially made stack decision, not as code to audit;
    - **small** (< ~10k LOC, single module) — all sections go into a single `agents.md`, no separate docs; service artifacts (config, decisions.md, audit/) still live in `docs/`;
    - **medium/large** — the full file set, linked from `agents.md`.
 3. Ask the user (in one message):
