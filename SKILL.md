@@ -10,7 +10,7 @@ All artifacts are written to `docs/` in the project root.
 
 ## Hard rules (apply in every phase)
 
-1. **The skill never modifies project code — in any phase.** It writes only to `docs/` and, in the project root, `agents.md` and `.jcodemunch.jsonc`.
+1. **The skill never modifies project code — in any phase.** It writes only to `docs/`, the root `agents.md` and `.jcodemunch.jsonc`, and — in local-only mode — `.git/info/exclude`.
 2. **Every claim comes with evidence.** Format: file path, occurrence count, example. A claim without evidence does not become a finding.
 3. **Anything irreversible is always a user question**, regardless of level: deleting code, major version bumps, paid services, DB schema changes.
 4. **Auditor subagents are read-only.** They return YAML; only the main agent writes files.
@@ -28,9 +28,11 @@ All artifacts are written to `docs/` in the project root.
 3. Ask the user (in one message):
    - level: `novice` / `specialist` / `expert` (see references/decision-matrix.md);
    - language (default English; tell the user they can reply in any language — the interview and the generated docs will continue in it);
-   - zones to leave untouched (vendored code, generated, legacy-on-purpose).
+   - zones to leave untouched (vendored code, generated, legacy-on-purpose);
+   - tracked or local-only: commit the generated files to the repo (team-shared, default), or keep them out of version control via `.git/info/exclude` (personal/local; `git_exclude: true`).
 4. Check availability of the jcodemunch MCP and the ponytail skill — both are optional, but whatever is present must be used (rule 6). jcodemunch: make sure the project index exists and is fresh (offer reindexing if needed) — auditors and verify run an order of magnitude cheaper through it; if unavailable, proceed without it and mention that to the user once. ponytail: affects Generate and Review (see "Companion tools").
 5. Write the answers to `docs/project-context.config.yaml`.
+6. If local-only mode was chosen (`git_exclude: true`) and the project is a git repo: add every path the skill creates (`docs/`, `agents.md`, `.jcodemunch.jsonc`) to `.git/info/exclude` — it is never committed, unlike `.gitignore` — and keep it updated as new files appear. Honest trade-off to keep in mind: local-only docs never reach CI, so headless Review runs only on machines that have them.
 
 ## Phase 1 — Audit
 
@@ -71,6 +73,7 @@ All artifacts are written to `docs/` in the project root.
    - `migration-backlog.md` — a priority-ordered plan for reaching the target state; each item: what, where (paths), why, S/M/L effort, risk.
 4. **All cross-references between the generated docs and agents.md are wikilinks**: `[[techstack]]`, `[[decisions#ADR-007]]`, `[[migration-backlog#MB-003]]`. Whenever one doc mentions another (or agents.md), write the mention as a wikilink — the docs must form a connected graph, not isolated files. The templates show the pattern.
 5. Generate/update `agents.md` in the root: a short core (working rules + a "which file to read for which task" matrix) and wikilinks to all files, under ~100 lines. Do not duplicate file contents inside agents.md. Include the template's conditional lines (jcodemunch, ponytail) based on whether the tool is actually present.
+   If `agents.md` already exists and was not produced by this skill (first run, no config yet) — ask, at every level: **merge** (default: preserve the existing content, weave our sections and links in), **overwrite**, or **write alongside** to a separate file (suggest `agents.project-context.md`) leaving the existing one untouched. When writing alongside, the docs' `[[agents]]` wikilinks point to the chosen name instead.
    Must include a **Definition of Done** — the checklist without which the agent does not consider a task complete (tests per testing.md, edge cases covered, docs updated, layer boundaries intact, no new dependencies without an ADR, security rules followed).
 6. If jcodemunch is available: generate/update `.jcodemunch.jsonc` in the root — declare the layers of the target architecture (from decisions) so get_layer_violations can machine-check the boundaries. Show it to the user before writing.
 7. For a small project — everything goes into a single agents.md, as sections; wikilinks then point to anchors inside it (`[[agents#Tech stack]]`) instead of separate files.

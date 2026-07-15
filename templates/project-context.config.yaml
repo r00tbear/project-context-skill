@@ -3,6 +3,7 @@ user_level: specialist      # novice | specialist | expert
 language: en                # interview AND generated docs; the user may set any language
 project_size: medium        # small | medium | large (determined in phase 0)
 docs_dir: docs
+git_exclude: false          # true = keep all generated files out of version control via .git/info/exclude (local-only)
 exclude:                    # zones the audit leaves untouched
   - vendor/
 last_audit: null
