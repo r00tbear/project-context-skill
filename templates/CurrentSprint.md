@@ -1,14 +1,18 @@
 # CurrentSprint.md — current iteration
 
-One sprint — one agent — one context.
+## Work
 
-## Sprint tasks
-<!-- id → task → status (todo/in-progress/done) → priority -->
+| task | status | owner/host | worktree | claimed paths | verification |
+|---|---|---|---|---|---|
 
-## Related files
-## Sprint constraints
-<!-- what we are NOT doing this sprint -->
+## Coordination
 
-## Expected outcome
+- One agent owns a path at a time; overlapping work needs an explicit handoff.
+- Update the row before and after implementation.
+- Handoffs state changed paths, checks run, remaining work, and blockers.
 
-Related: [[agents]] · [[migration-backlog]]
+## Out of scope
+
+<!-- Work deliberately deferred from this iteration. -->
+
+Related: [[context]] · [[migration_backlog]]

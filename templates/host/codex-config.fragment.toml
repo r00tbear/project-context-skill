@@ -1,0 +1,2 @@
+# Optional fallback only; AGENTS.md remains the primary Codex project document.
+project_doc_fallback_filenames = ["PROJECT_CONTEXT.md"]

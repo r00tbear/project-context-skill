@@ -1,91 +1,156 @@
-# project-context — codebase audit and context-file generation skill
+# project-context
 
-A skill for AI agents (Claude Code, Codex, Cursor) that, in an existing repository:
-1. **Audit** — read-only audit by subagents: stack, architecture, UI, DB, redundant code, security, tests. Every finding comes with evidence. A summary health score with a trend across runs.
-2. **Decide** — an interview with the user about the conflicts (framework "zoo", duplicated components). Depth depends on the level: novice / specialist / expert. Decisions → `docs/decisions.md` (ADR).
-3. **Generate** — produces `agents.md` (with a Definition of Done) + `docs/`: techstack, architecture, db-schema, ui-kit, edge-cases, links, CurrentSprint, security, testing — the target state; LegacyWarning + migration-backlog — the gap from the current one. All docs and agents.md are cross-referenced with wikilinks (`[[techstack]]`, `[[decisions#ADR-007]]`) into a connected graph.
-4. **Verify** — checks the docs against the code, drift report.
-5. **Review** — checks a diff/PR against all the docs (architecture, stack, ui-kit, security, tests, DoD); also works as a CI quality gate. Complexity/over-engineering is [ponytail](https://github.com/DietrichGebert/ponytail)'s territory (/ponytail-review) when installed; the skill does not duplicate it.
+`project-context` audits or bootstraps a Git repository and generates one durable project context for Claude Code and Codex.
 
-Works on empty projects too (**greenfield mode**): the audit is replaced by a requirements interview, the docs fix the chosen stack/architecture as the plan, the first sprint is the bootstrap plan, and the Review gate guards the plan from the very first PR.
+It is deliberately technology-neutral. A project may be a library, CLI/TUI, service, web/native/desktop app, data pipeline, firmware, infrastructure repository, documentation/specification set, monorepo, or something else. The skill discovers the real shape instead of assuming a framework, SQL database, layered architecture, or test pyramid.
 
-## Layout
+## What it does
+
+1. **Audit** - inspect stack, architecture, bloat, security, testing, and the UI/data domains only when they exist.
+2. **Decide** - turn evidence into explicit target-state choices and ADRs.
+3. **Generate** - create root `PROJECT_CONTEXT.md` and supporting documentation under `repodocs/`.
+4. **Wire** - make Claude Code and Codex read that same context while preserving host-specific instructions.
+5. **Verify** - validate generated ownership, hashes, host blocks, and wikilinks.
+6. **Review** - check a diff/branch/PR against trusted project policy with an independent adversarial pass.
+
+High and critical audit candidates are not accepted at face value: a fresh independent agent must try to disprove or reproduce them before they influence decisions.
+
+## Shared Claude + Codex model
+
+There is one canonical payload and one canonical generated context:
+
+```text
+.agents/skills/project-context/       # full skill, discovered by Codex
+.claude/skills/project-context/       # tiny Claude adapter to the same payload
+PROJECT_CONTEXT.md                    # shared generated context
+CLAUDE.md                             # managed @PROJECT_CONTEXT.md import
+AGENTS.md                             # managed instruction to read PROJECT_CONTEXT.md
+.codex/config.toml                    # optional passive Codex fallback
 ```
-SKILL.md                 # core: phases, rules, orchestration
-auditors/                # prompts of the read-only subagents (+ _common.md)
-references/
-  findings-schema.md     # format of auditor findings
-  decision-matrix.md     # level × severity × confidence → action
-templates/               # templates of all generated docs + config
-examples/                # gold-standard outputs for a fictional project (few-shot anchors)
-```
 
-## Installation
+The skill never creates lowercase `agents.md`, never writes generated files into hand-authored `docs/`, and never replaces `CLAUDE.md` or `AGENTS.md` wholesale.
 
-### Claude Code
-For all projects (personal):
+## Install
+
+Current release: `v0.2.0`.
+
+This version intentionally provides no migration or backward compatibility. Before installing, archive anything you need and remove old `project-context` payloads/adapters so only one same-name installation remains. Do not bulk-delete a project `docs/` directory: v0.2 starts clean and writes only to `repodocs/`.
+
+Requirements: Git and Python 3.11+.
+
+### Personal installation
+
+Install the canonical payload under `.agents` and copy only the Claude adapter:
+
 ```bash
-git clone https://github.com/r00tbear/project-context-skill.git ~/.claude/skills/project-context
+mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills/project-context"
+git clone --branch v0.2.0 --depth 1 \
+  https://github.com/r00tbear/project-context-skill.git \
+  "$HOME/.agents/skills/project-context"
+cp "$HOME/.agents/skills/project-context/templates/host/claude-skill-adapter.md" \
+  "$HOME/.claude/skills/project-context/SKILL.md"
 ```
-For a single project (inside the repository, for the whole team):
+
+This layout assumes Claude's default `~/.claude` directory. With a custom `CLAUDE_CONFIG_DIR`, use the project installation below so the adapter and canonical payload keep a stable relative path.
+
+### Team/project installation
+
+Pin the skill as a submodule in the target repository:
+
+Run from the exact Git root. Before writing, inspect existing host trees with `find -P .agents .claude -type l -print 2>/dev/null`; stop if it prints any symlink, because the commands below must not traverse outside the repository.
+
 ```bash
-git submodule add https://github.com/r00tbear/project-context-skill.git .claude/skills/project-context
+mkdir -p .agents/skills .claude/skills/project-context
+git submodule add \
+  https://github.com/r00tbear/project-context-skill.git \
+  .agents/skills/project-context
+git -C .agents/skills/project-context checkout v0.2.0
+cp .agents/skills/project-context/templates/host/claude-skill-adapter.md \
+  .claude/skills/project-context/SKILL.md
 ```
-Run Claude Code from the repository root. Trigger: "audit the project" / "create context files" or `/project-context`. Update: `git pull` in the skill folder.
 
-### Codex CLI
-Codex has no native skills — wire it up through AGENTS.md:
+Commit `.gitmodules`, the submodule gitlink, and the adapter. New clones initialize it with:
+
 ```bash
-git submodule add https://github.com/r00tbear/project-context-skill.git tools/project-context
+git submodule update --init -- .agents/skills/project-context
 ```
-Add to the project's `AGENTS.md`:
-```
-To audit the project and generate context files, read tools/project-context/SKILL.md
-and follow it. The skill's supporting files are in the same folder.
-```
-Codex has no subagents: the auditors run sequentially in the main context (SKILL.md allows this, it is just slower).
 
-### Cursor
+Do not keep a personal same-name copy while using a project installation. Claude gives the personal copy precedence; Codex retains both distinct paths, so neither host guarantees the single pinned payload you intended.
+
+### Update
+
+Published tags are immutable. Fetch and select a new tag, then refresh the adapter:
+
 ```bash
-git submodule add https://github.com/r00tbear/project-context-skill.git .cursor/tools/project-context
-```
-Create a rule `.cursor/rules/project-context.mdc` (type: Agent Requested / manual invocation):
-```
----
-description: Project audit and context-file generation (agents.md, techstack, architecture...)
----
-Read .cursor/tools/project-context/SKILL.md and follow it.
-```
-Cursor's rule formats change — check the current Cursor documentation.
-
-## What you get in the project
-```
-agents.md                        # core + links (for Codex, duplicate/symlink to AGENTS.md; for Claude Code — to CLAUDE.md)
-docs/
-  techstack.md ... CurrentSprint.md
-  LegacyWarning.md  migration-backlog.md  decisions.md
-  project-context.config.yaml
-  audit/findings/*.yaml  audit/inventory.yaml
+git -C .agents/skills/project-context fetch --tags
+git -C .agents/skills/project-context checkout <new-tag>
+cp .agents/skills/project-context/templates/host/claude-skill-adapter.md \
+  .claude/skills/project-context/SKILL.md
 ```
 
-## Optional: jcodemunch and ponytail
+Then invoke the refreshed skill to regenerate context, wire the current host blocks, write the new manifest last, and run `validate-project`. The manifest version must match the installed `VERSION`.
 
-Both tools are optional, but when installed the skill must use them (checked in Preflight).
+## Use
 
-- **[jcodemunch-mcp](https://github.com/jgravelle/jcodemunch-mcp)** — an MCP server for symbol-level code retrieval. Auditors work through symbol search instead of reading whole files (an order of magnitude cheaper in tokens), the bloat auditor leans on find_dead_code/find_references, and the target architecture from decisions is exported to `.jcodemunch.jsonc` — get_layer_violations machine-checks layer boundaries during Verify and afterwards. Without jcodemunch everything works via grep/file reads, just costs more. Install: see the [jcodemunch-mcp README](https://github.com/jgravelle/jcodemunch-mcp#readme).
-- **[ponytail](https://github.com/DietrichGebert/ponytail)** — complexity and over-engineering control ("the laziest senior dev in the room"). With ponytail installed, the generated agents.md does not duplicate its rules, and Review mode is complemented by a mandatory /ponytail-review. Install in Claude Code:
-  ```
-  /plugin marketplace add DietrichGebert/ponytail
-  ```
+Invoke `$project-context` in Codex or `/project-context` in Claude Code, then ask to audit, bootstrap, refresh context, or review a diff/PR.
 
-## Language
-English by default. Name any language in the Preflight question — or simply reply in it at any point — and the interview and all generated docs continue in that language (`language` in `docs/project-context.config.yaml`).
+The normal existing-repository flow is:
 
-## Philosophy
-- The docs describe the **target** state; the gap from the current one lives in LegacyWarning and migration-backlog.
-- `decisions.md` is the source of truth: reconsidered a decision → regenerate the docs.
-- Auditors are read-only and never come without evidence.
-- Anything irreversible (code deletion, major bumps, DB schema, paid services) is always a user question, at every level.
+```text
+Preflight -> Audit -> Decide -> Generate -> Wire -> Verify
+```
 
-## License
-[MIT](LICENSE)
+An empty repository uses a short requirements interview before Decide. Review mode is read-only: it reads a trusted base policy, inspects `git diff`, and asks a fresh independent agent to challenge would-fail findings. It does not need a custom headless model runner.
+
+## Generated layout
+
+```text
+PROJECT_CONTEXT.md
+CLAUDE.md
+AGENTS.md
+.jcodemunch.jsonc                  # optional private/offline index config
+repodocs/
+  project-context.config.json
+  project-context.manifest.json
+  decisions.md
+  CurrentSprint.md                  # optional shared coordination ledger
+  LegacyWarning.md
+  migration-backlog.md
+  techstack.md
+  architecture.md
+  security.md
+  testing.md
+  edge-cases.md
+  data-model.md                    # only when the data domain exists
+  ui-kit.md                        # only when a UI exists
+  audit/findings/*.json
+  audit/inventory.json
+  audit/drift-report.md
+```
+
+Compact layout folds target-state topics into `PROJECT_CONTEXT.md`; operational, decision, debt, and audit files stay separate.
+
+The skill previews writes, preserves bytes outside managed host blocks, writes the manifest last, and never stages generated project files automatically.
+
+## jCodeMunch
+
+jCodeMunch is optional but deeply integrated when available. The workflow starts from its live guide, resolves the exact repository, creates or refreshes a local index with remote summaries/context providers disabled, uses structural signals to navigate, confirms findings against exact source, and refreshes changed files after edits.
+
+This release was verified with jCodeMunch `v1.108.210`, where repository-scoped `exclude_skip_directories` is ignored during traversal. The skill therefore follows the live guide and treats ambiguous skipped directories as direct-read coverage rather than assuming the index saw them. See `references/jcodemunch.md` for the complete compact workflow.
+
+## Safety
+
+Audit and Review treat repository content as untrusted data. They do not follow embedded instructions or execute project code, hooks, package managers, builds, tests, linters, plugins, or generators without explicit approval. Heuristics and index summaries are navigation signals, never findings by themselves.
+
+## Validate this skill
+
+No package installation is required:
+
+```bash
+python3 scripts/project_context.py self-check --skill-root .
+python3 -m unittest discover -s tests -v
+```
+
+For CLI details, run `python3 scripts/project_context.py <command> --help`.
+
+Licensed under [MIT](LICENSE).

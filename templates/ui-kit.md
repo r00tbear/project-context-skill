@@ -1,17 +1,23 @@
-# ui-kit.md — UI kit and existing components
+# ui-kit.md — interface system and reusable UI
 
-Purpose: the agent builds UI to the project's standards, not "working but homemade".
+<!-- Purpose: when a user interface exists, the agent follows its established interaction and presentation system instead of inventing a parallel one. Applies to web, native, desktop, TUI/terminal, embedded, or other presentation surfaces. -->
 
-## Where the UI kit lives
-## Components that already exist
-<!-- name → purpose → path -->
+## Surfaces, platforms, and input modes
+<!-- which UI capabilities actually exist: visual/textual, browser/native/desktop/terminal/device, pointer/touch/keyboard/screen reader, responsive/adaptive, offline, localization -->
 
-## Which components to use (canonical)
-## What must not be written from scratch
-## Design tokens
-<!-- colors, spacing, typography — where to take them from -->
+## Where shared interface primitives live
+## Existing screens, views, components, widgets, or commands
+<!-- domain-native unit → purpose → path -->
 
-## Docs / Storybook
-<!-- how to open -->
+## Canonical primitives and interaction patterns
+## What must not be reimplemented
+## Presentation resources and tokens
+<!-- theme/color/spacing/typography/icons/terminal styles/platform resources only where supported; name the source of truth -->
 
-Related: [[agents]] · [[techstack]] · [[architecture]]
+## Accessibility and platform conventions
+<!-- required navigation/focus/input semantics, announcements, contrast/motion, native conventions, or terminal behavior only for applicable capabilities -->
+
+## Preview, catalog, or interface documentation
+<!-- Storybook, previews, screenshots/golden tests, emulator/device steps, terminal demos, or "none"—how to inspect it -->
+
+Related: [[context]] · [[techstack]] · [[architecture]]

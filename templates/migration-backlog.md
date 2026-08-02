@@ -2,9 +2,10 @@
 
 Ordered by priority. Done items are not deleted — mark them done with a date.
 
+<a id="MB-001"></a>
 ## MB-001: <what to do>
 - Priority: P1 · Effort: S/M/L · Status: todo
-- From decision: [[decisions#ADR-NNN]] · Findings: <id> · Debt: [[LegacyWarning]]
+- From decision: [[decisions#ADR-NNN]] · Findings: <id> · Debt: [[legacy_warning]]
 - Where: <paths>
 - What exactly: <concrete steps>
 - Risk: <what may break, how to verify>

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "skill_version": "0.2.0",
+  "config_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "domains": ["architecture", "stack", "security", "testing"],
+  "hosts": ["claude", "codex"],
+  "artifacts": [
+    {"id": "context", "path": "PROJECT_CONTEXT.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "architecture", "path": "repodocs/architecture.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "techstack", "path": "repodocs/techstack.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "security", "path": "repodocs/security.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "testing", "path": "repodocs/testing.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "edge_cases", "path": "repodocs/edge-cases.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "decisions", "path": "repodocs/decisions.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "legacy_warning", "path": "repodocs/LegacyWarning.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "migration_backlog", "path": "repodocs/migration-backlog.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "finding_stack", "path": "repodocs/audit/findings/stack.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "finding_architecture", "path": "repodocs/audit/findings/architecture.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "finding_bloat", "path": "repodocs/audit/findings/bloat.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "finding_security", "path": "repodocs/audit/findings/security.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "finding_testing", "path": "repodocs/audit/findings/testing.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "audit_inventory", "path": "repodocs/audit/inventory.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "drift_report", "path": "repodocs/audit/drift-report.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "claude_host", "path": "CLAUDE.md", "kind": "managed_block", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "codex_host", "path": "AGENTS.md", "kind": "managed_block", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+  ]
+}

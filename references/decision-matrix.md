@@ -1,31 +1,21 @@
-# Decision matrix (Decide phase)
+# Decision matrix
 
-The action for each conflict group is determined by three axes: user level × severity × confidence.
-
-## Levels
-- **novice** — the user trusts the agent. The agent makes the best decisions itself; questions are the exception.
-- **specialist** — the agent decides the routine; big forks go to the user with a ready recommendation ("Enter = accept").
-- **expert** — the agent decides only the obvious; everything debatable goes to the user with full trade-offs and no nudging.
-
-## Matrix
+Adapt decisions to `user_level` without hiding evidence or making irreversible choices for the user.
 
 | Situation | novice | specialist | expert |
 |---|---|---|---|
-| severity low/medium, confidence high | decide auto | decide auto | recommendation → confirm |
-| severity high, confidence high | decide auto, report | recommendation → confirm | full trade-offs |
-| any severity, confidence low/medium | recommendation → confirm | full trade-offs | full trade-offs |
-| options are a toss-up (~50/50) | ask (briefly) | ask | ask |
+| Low/medium severity, high confidence | decide and report | decide and report | recommend, confirm if debatable |
+| High severity, high confidence | recommend, confirm | recommend, confirm | show full trade-offs |
+| Critical severity, any confidence | recommend, confirm | recommend, confirm | show full trade-offs |
+| Non-critical severity, low/medium confidence | recommend, confirm | show full trade-offs | show full trade-offs |
+| Options are genuinely balanced | ask briefly | ask | ask |
 
-## Exceptions — always ask, at every level
+Always ask before:
+
 - deleting code or files;
-- major version changes of a dependency/language/framework;
-- anything touching paid services or infrastructure;
-- DB schema changes;
-- any irreversible action.
+- irreversible work;
+- major dependency/runtime/platform compatibility changes;
+- paid services or infrastructure;
+- compatibility-affecting persisted/shared data or protocol changes.
 
-At the novice level, exception questions are worded as briefly as possible: one line of essence + a recommendation.
-
-## Question format
-- group by topic (stack → architecture → UI → data → bloat), one topic — one message;
-- each question: the fact with evidence → options with effort/trade-offs → a recommendation;
-- record answers in docs/decisions.md immediately, not at the end of the phase.
+Ask by topic in this order when enabled: stack, architecture, UI, data, bloat, security, testing. State evidence, options, effort, trade-offs, and a recommendation. Record accepted policy in the in-memory ADR candidate immediately; persist it only with regenerated dependent docs. Policy changed by a reviewed diff cannot approve implementation in that same diff.

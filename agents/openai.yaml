@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Context"
+  short_description: "Build shared context for Claude Code and Codex"
+  default_prompt: "Use $project-context to audit this repository and create shared project guidance for Claude Code and Codex."
+
+policy:
+  allow_implicit_invocation: true

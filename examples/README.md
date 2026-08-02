@@ -1,11 +1,8 @@
-# Gold-standard examples
+# Compact example
 
-Filled outputs for **Shelfie**, a fictional project (React SPA + Express + PostgreSQL), showing the expected density, tone, and linking of everything the skill generates. Match the structure and quality — never copy the facts.
+This directory shows the compact root-context shape for **Maple**, a fictional in-process text-normalization library.
 
-- `agents.md` — the generated root file
-- `architecture.md` — one fully filled doc
-- `decisions.md` — one ADR
-- `migration-backlog.md` — one backlog item
-- `decide-question.md` — one Decide-phase question batch
-- `inventory.yaml` — audit summary with the default health-score formula
-- `greenfield-sprint.md` — the bootstrap CurrentSprint for an empty project (greenfield mode)
+- `PROJECT_CONTEXT.md` demonstrates compact layout.
+- `inventory.json` demonstrates one completed audit run.
+
+The example intentionally has no user-facing interface, persisted state, or externally shared serialized contract. Real projects enable UI and data guidance only when repository evidence supports those domains.

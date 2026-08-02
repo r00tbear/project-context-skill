@@ -1,18 +1,9 @@
-# UI Auditor
+# User-interface auditor
 
-The rules of `_common.md` (passed to you together with this prompt) are mandatory.
+Follow `_common.md`. Run only when a user-facing interactive or presentation surface exists: web, native mobile, desktop, terminal/TUI, embedded display, or another form.
 
-Topic: UI components and the design system.
+Inventory surfaces and shared primitives; inspect duplicate interaction units, inconsistent presentation resources/conventions, unnecessary bypasses of the active toolkit, reachability, navigation/focus, accessibility, localization, and loading/empty/error states only where applicable. Do not require CSS, browser components, visual tokens, pointer input, or a design system from every interface.
 
-What to investigate:
-1. Component inventory: where they live, whether there is a dedicated ui-kit/design-system directory, Storybook.
-2. Duplicates: components with a similar role and/or similar markup (several Button/Modal/Input, copy-paste with small tweaks). Compare by name, props, and JSX/template structure.
-3. Styles: approaches (CSS modules, styled, tailwind, inline) and their mixing; hardcoded colors/spacing vs tokens/variables.
-4. UI library usage: if one is wired in (MUI, CoreUI, antd...) — where custom components were written instead of using it.
-5. Components nobody imports.
+Typical kinds: `duplicate-interface-unit`, `inconsistent-presentation-system`, `hardcoded-design-values`, `library-bypassed`, `unused-interface-unit`, `accessibility-gap`.
 
-Typical findings: `duplicate-component`, `mixed-styling-approaches`, `hardcoded-design-values`, `library-bypassed`, `unused-component`.
-
-For duplicates — options: which component to make canonical (by quality/props coverage/usage count) and the list of files to switch over.
-
-With jcodemunch: search_symbols by role (Button, Modal, Input...) — inventory and duplicate candidates; find_references — which duplicate is actually used and how often; body comparison — pinpoint, via get_symbol_source.
+Prefer the platform-native or existing canonical primitive. Use similarity and references only inside confirmed interface roots and verify exact behavior; similar names or structure alone do not prove duplication or reachability.

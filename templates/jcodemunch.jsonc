@@ -1,0 +1,31 @@
+{
+  // Keep repository analysis local and deterministic.
+  "share_savings": false,
+  "use_ai_summaries": false,
+  "summarizer_provider": "none",
+  "allow_remote_summarizer": false,
+  "context_providers": false,
+  "enrichment": {"lsp_enabled": false},
+  "exclude_skip_directories": [
+    "build",
+    "dist",
+    "generated",
+    "node_modules",
+    "target",
+    "vendor"
+  ],
+  "extra_ignore_patterns": [
+    "**/.git/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/node_modules/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".jcodemunch.jsonc",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "PROJECT_CONTEXT.md",
+    "repodocs/**"
+  ]
+}

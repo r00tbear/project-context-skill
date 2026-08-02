@@ -1,18 +1,9 @@
-# Stack Auditor
+# Stack auditor
 
-The rules of `_common.md` (passed to you together with this prompt) are mandatory.
+Follow `_common.md`. Determine the actual languages, runtimes, platforms, dependencies, build/deployment tools, and equivalent domain facilities from authoritative declarations and real usage.
 
-Topic: the tech stack and dependencies.
+Inspect duplicate-purpose dependencies/subsystems, unused or undeclared facilities, incompatible or unsupported release lines, and conflicting tooling ownership. Do not assume semantic versioning, package imports, a package manager, CI, containers, or a conventional application stack.
 
-What to investigate:
-1. Manifests: package.json (+lock), requirements/pyproject, go.mod, etc. — languages, frameworks, versions.
-2. Actual usage: imports in code vs declared dependencies (dead dependencies, usage without declaration).
-3. Duplicate-purpose libraries: two+ libraries for the same job (axios + fetch wrappers, moment + dayjs, lodash + ramda, two HTTP clients, two validators, two state managers).
-4. Version spread: outdated majors, versions with known EOL, incompatible pairs.
-5. Tooling: linters/formatters/CI — any conflicting configs.
+Typical kinds: `duplicate-purpose-libs`, `unused-dependency`, `undeclared-dependency`, `outdated-release-line`, `conflicting-tooling`.
 
-Typical findings: `duplicate-purpose-libs`, `unused-dependency`, `undeclared-dependency`, `outdated-major`, `conflicting-tooling`.
-
-For every duplicate — options: which library to keep, with a migration cost estimate (how many files are affected).
-
-With jcodemunch: find_importers on a package — actual dependency usage (for unused/duplicate-purpose); symbol search for wrappers around libraries.
+For duplicates, identify each competing owner and the migration surface in relevant units; the main agent formulates options during Decide. Read manifests, locks, toolchain/platform descriptors, and build definitions directly. Use jCodeMunch importers/references only when they represent the project's real linkage mechanism; confirm every unused/duplicate claim.
