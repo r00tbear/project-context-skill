@@ -902,7 +902,7 @@ def self_check(skill_root: Path) -> dict[str, Any]:
         "templates/jcodemunch.jsonc",
     }
     required |= {f"auditors/{name}.md" for name in ("_common", "architecture", "bloat", "data", "security", "stack", "testing", "ui")}
-    required |= {f"references/{name}.md" for name in ("decision-matrix", "diff-review", "findings-schema", "greenfield", "host-integration", "jcodemunch")}
+    required |= {f"references/{name}.md" for name in ("decision-matrix", "diff-review", "findings-schema", "greenfield", "host-integration", "jcodemunch", "upgrade")}
     required |= {f"templates/{name}.md" for name in ("CurrentSprint", "LegacyWarning", "architecture", "data-model", "decisions", "drift-report", "edge-cases", "migration-backlog", "security", "techstack", "testing", "ui-kit")}
     missing = sorted(relative for relative in required if not (root / relative).is_file())
     if missing:

@@ -32,7 +32,7 @@ The skill never creates lowercase `agents.md`, never writes generated files into
 
 ## Install
 
-Current release: `v0.2.0`.
+Current release: `v0.2.1`.
 
 This version intentionally provides no migration or backward compatibility. Before installing, archive anything you need and remove old `project-context` payloads/adapters so only one same-name installation remains. Do not bulk-delete a project `docs/` directory: v0.2 starts clean and writes only to `repodocs/`.
 
@@ -44,7 +44,7 @@ Install the canonical payload under `.agents` and copy only the Claude adapter:
 
 ```bash
 mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills/project-context"
-git clone --branch v0.2.0 --depth 1 \
+git clone --branch v0.2.1 --depth 1 \
   https://github.com/r00tbear/project-context-skill.git \
   "$HOME/.agents/skills/project-context"
 cp "$HOME/.agents/skills/project-context/templates/host/claude-skill-adapter.md" \
@@ -64,7 +64,7 @@ mkdir -p .agents/skills .claude/skills/project-context
 git submodule add \
   https://github.com/r00tbear/project-context-skill.git \
   .agents/skills/project-context
-git -C .agents/skills/project-context checkout v0.2.0
+git -C .agents/skills/project-context checkout v0.2.1
 cp .agents/skills/project-context/templates/host/claude-skill-adapter.md \
   .claude/skills/project-context/SKILL.md
 ```
@@ -79,7 +79,9 @@ Do not keep a personal same-name copy while using a project installation. Claude
 
 ### Update
 
-Published tags are immutable. Fetch and select a new tag, then refresh the adapter:
+The fastest path is to ask your agent — "update the project-context skill" / «обнови скилл project-context». The skill's upgrade mode (`references/upgrade.md`) inventories every installed copy, updates the payload and adapter to the new tag, removes duplicates with your confirmation, and re-applies the context in the project.
+
+Manual equivalent — published tags are immutable; fetch and select a new tag, then refresh the adapter:
 
 ```bash
 git -C .agents/skills/project-context fetch --tags

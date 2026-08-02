@@ -1,6 +1,6 @@
 ---
 name: project-context
-description: Audit or bootstrap any Git repository and generate technology-neutral project context shared by Claude Code and Codex. Use for repository audits, greenfield planning, PROJECT_CONTEXT.md/CLAUDE.md/AGENTS.md setup, architecture and stack decisions, technical-debt discovery, adversarial verification, jCodeMunch-backed analysis, documentation refresh, diff/PR review against project policy, or when the user says "сделай аудит проекта", "создай файлы контекста", "проверь diff/PR по докам".
+description: Audit or bootstrap any Git repository and generate technology-neutral project context shared by Claude Code and Codex. Use for repository audits, greenfield planning, PROJECT_CONTEXT.md/CLAUDE.md/AGENTS.md setup, architecture and stack decisions, technical-debt discovery, adversarial verification, jCodeMunch-backed analysis, documentation refresh, diff/PR review against project policy, updating this skill itself to a newer release, or when the user says "сделай аудит проекта", "создай файлы контекста", "проверь diff/PR по докам", "обнови скилл project-context".
 license: MIT
 ---
 
@@ -37,6 +37,7 @@ During Audit and Review:
 | Plan an empty/new repository | Greenfield -> Decide -> Generate -> Wire -> Verify |
 | Review a diff, branch, commit, or PR | Review |
 | Refresh docs after known changes | Re-audit affected domains, then Generate -> Wire -> Verify |
+| Update this skill itself and re-apply it | Upgrade - read `references/upgrade.md` |
 
 ## 0. Preflight
 
@@ -109,6 +110,7 @@ Read `references/diff-review.md`. Review is a workflow, not a bundled model runn
 - `references/host-integration.md` - shared Claude/Codex installation and blocks
 - `references/jcodemunch.md` - deep index workflow and privacy profile
 - `references/diff-review.md` - interactive diff/PR review
+- `references/upgrade.md` - self-update of this skill and project re-apply
 - `auditors/*.md` - technology-neutral audit prompts
 - `templates/` - generated docs and host fragments
 
