@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/r00tbear/project-context-skill/schemas/project-map.schema.json",
+  "title": "project-context project map v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "nodes", "edges"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "nodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/node"}
+    },
+    "edges": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/edge"}
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\\\n\\r\\u0000]).+$"
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "detail"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "line": {"type": "integer", "minimum": 1},
+        "detail": {"type": "string", "minLength": 1}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "kind", "status", "evidence"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+        "label": {"type": "string", "minLength": 1},
+        "group": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["surface", "component", "data", "runtime", "external", "other"]},
+        "status": {"enum": ["current", "planned", "legacy"]},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/evidence"}
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "label", "evidence"],
+      "properties": {
+        "from": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+        "to": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+        "label": {"type": "string", "minLength": 1},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/evidence"}
+        }
+      }
+    }
+  }
+}

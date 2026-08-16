@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "run_id": "audit-20260802T120000Z-example",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client",
+      "group": "Interface",
+      "kind": "surface",
+      "status": "current",
+      "evidence": [{"path": "src/interface/client", "detail": "Defines the supported request entry surface."}]
+    },
+    {
+      "id": "request_gateway",
+      "label": "Request gateway",
+      "group": "Interface",
+      "kind": "component",
+      "status": "current",
+      "evidence": [{"path": "src/interface/request_gateway", "detail": "Validates requests before dispatch."}]
+    },
+    {
+      "id": "workflow",
+      "label": "Core workflow",
+      "group": "Core",
+      "kind": "component",
+      "status": "current",
+      "evidence": [{"path": "src/core/workflow", "detail": "Coordinates the primary domain operation."}]
+    },
+    {
+      "id": "record_store",
+      "label": "Record store",
+      "group": "Data",
+      "kind": "data",
+      "status": "current",
+      "evidence": [{"path": "src/data/record_store", "detail": "Owns persisted records for the core workflow."}]
+    },
+    {
+      "id": "legacy_import",
+      "label": "Legacy import",
+      "group": "Legacy",
+      "kind": "component",
+      "status": "legacy",
+      "evidence": [{"path": "src/legacy/import_records", "detail": "Feeds older record formats into the current workflow."}]
+    },
+    {
+      "id": "event_sink",
+      "label": "Event sink",
+      "group": "Planned",
+      "kind": "external",
+      "status": "planned",
+      "evidence": [{"path": "repodocs/decisions.md", "detail": "ADR-002 accepts publishing completed-operation events."}]
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "request_gateway",
+      "label": "submits request",
+      "evidence": [{"path": "src/interface/client", "detail": "The client sends requests to the gateway."}]
+    },
+    {
+      "from": "request_gateway",
+      "to": "workflow",
+      "label": "dispatches",
+      "evidence": [{"path": "src/interface/request_gateway", "detail": "Validated requests enter the core workflow."}]
+    },
+    {
+      "from": "workflow",
+      "to": "record_store",
+      "label": "reads and writes",
+      "evidence": [{"path": "src/core/workflow", "detail": "The workflow reads and persists records through the store."}]
+    },
+    {
+      "from": "legacy_import",
+      "to": "workflow",
+      "label": "imports records",
+      "evidence": [{"path": "src/legacy/import_records", "detail": "Legacy records enter through the current workflow boundary."}]
+    },
+    {
+      "from": "workflow",
+      "to": "event_sink",
+      "label": "publishes completion",
+      "evidence": [{"path": "repodocs/decisions.md", "detail": "ADR-002 approves the planned completion-event relationship."}]
+    }
+  ]
+}

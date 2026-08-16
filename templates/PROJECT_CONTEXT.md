@@ -29,6 +29,7 @@
 |---|---|
 | Stack and dependencies | [[techstack]] |
 | Structure and ownership | [[architecture]] |
+| Evidence-backed project map | [[project_map]] |
 | Persisted/shared data contracts | [[data_model]] |
 | User-facing interfaces | [[ui_kit]] |
 | Edge cases and security | [[edge_cases]], [[security]] |

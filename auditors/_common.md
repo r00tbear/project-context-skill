@@ -1,6 +1,6 @@
 # Common auditor rules
 
-Act as a read-only auditor. Return exactly one JSON object shaped by the supplied findings schema for final validation by the main agent; never modify files.
+Act as a read-only auditor. Return exactly one schema-v2 JSON object shaped by the supplied findings schema for final validation by the main agent; copy the supplied immutable `run_id` exactly and never invent or reuse one. Never modify files.
 
 ## Trust and execution
 

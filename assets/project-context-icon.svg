@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title description">
+  <title id="title">Project Context</title>
+  <desc id="description">Square brackets surrounding a connected three-node graph.</desc>
+  <style>
+    .bracket { stroke: #292426; }
+    @media (prefers-color-scheme: dark) { .bracket { stroke: #eee7e1; } }
+  </style>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path class="bracket" d="M10 5H6.5A1.5 1.5 0 0 0 5 6.5v19A1.5 1.5 0 0 0 6.5 27H10M22 5h3.5A1.5 1.5 0 0 1 27 6.5v19a1.5 1.5 0 0 1-1.5 1.5H22" stroke-width="2"/>
+    <path d="m12.1 14.9 6.8-3.3M12.1 17.1l6.8 3.3" stroke="#bd5734" stroke-width="1.8"/>
+  </g>
+  <circle cx="10" cy="16" r="2.35" fill="#bd5734"/>
+  <circle cx="21" cy="11" r="2.35" fill="#bd5734"/>
+  <circle cx="21" cy="21" r="2.35" fill="#bd5734"/>
+</svg>

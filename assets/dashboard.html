@@ -1,0 +1,2107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Project Context Dashboard</title>
+  <style nonce="__CSP_NONCE__">
+    :root {
+      color-scheme: light;
+      --canvas: oklch(97.5% 0.009 61);
+      --surface: oklch(99.1% 0.005 61);
+      --surface-muted: oklch(94.8% 0.012 61);
+      --surface-strong: oklch(91.5% 0.018 61);
+      --ink: oklch(22.5% 0.018 42);
+      --ink-muted: oklch(48% 0.023 42);
+      --border: oklch(84.5% 0.021 61);
+      --accent: oklch(51% 0.157 43);
+      --accent-hover: oklch(45% 0.15 43);
+      --on-accent: oklch(98% 0.006 61);
+      --critical: oklch(49% 0.19 27);
+      --critical-bg: oklch(94% 0.038 27);
+      --high: oklch(52% 0.15 52);
+      --high-bg: oklch(94% 0.04 52);
+      --medium: oklch(48% 0.105 86);
+      --medium-bg: oklch(95% 0.04 86);
+      --low: oklch(44% 0.105 232);
+      --low-bg: oklch(94% 0.028 232);
+      --success: oklch(42% 0.105 151);
+      --success-bg: oklch(94% 0.032 151);
+      --info: oklch(44% 0.105 250);
+      --info-bg: oklch(94% 0.028 250);
+      --kind-surface: oklch(53% 0.13 43);
+      --kind-component: oklch(49% 0.105 278);
+      --kind-data: oklch(45% 0.09 155);
+      --kind-runtime: oklch(47% 0.1 235);
+      --kind-external: oklch(51% 0.105 83);
+      --kind-other: oklch(50% 0.025 43);
+      --shadow: 0 16px 44px oklch(30% 0.03 43 / 0.08);
+      --radius: 12px;
+      --radius-small: 8px;
+      --focus: 0 0 0 3px oklch(62% 0.13 43 / 0.32);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-synthesis: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --canvas: oklch(16.5% 0.015 43);
+        --surface: oklch(20.5% 0.017 43);
+        --surface-muted: oklch(25% 0.019 43);
+        --surface-strong: oklch(30% 0.022 43);
+        --ink: oklch(92.5% 0.012 61);
+        --ink-muted: oklch(69% 0.019 61);
+        --border: oklch(34% 0.024 43);
+        --accent: oklch(72% 0.13 49);
+        --accent-hover: oklch(78% 0.115 49);
+        --on-accent: oklch(18% 0.018 43);
+        --critical: oklch(76% 0.145 27);
+        --critical-bg: oklch(27% 0.06 27);
+        --high: oklch(77% 0.12 52);
+        --high-bg: oklch(28% 0.052 52);
+        --medium: oklch(80% 0.105 86);
+        --medium-bg: oklch(29% 0.045 86);
+        --low: oklch(76% 0.09 232);
+        --low-bg: oklch(27% 0.04 232);
+        --success: oklch(76% 0.09 151);
+        --success-bg: oklch(27% 0.043 151);
+        --info: oklch(76% 0.09 250);
+        --info-bg: oklch(27% 0.04 250);
+        --kind-surface: oklch(74% 0.115 49);
+        --kind-component: oklch(74% 0.09 278);
+        --kind-data: oklch(75% 0.075 155);
+        --kind-runtime: oklch(75% 0.08 235);
+        --kind-external: oklch(78% 0.09 83);
+        --kind-other: oklch(72% 0.025 61);
+        --shadow: 0 18px 48px oklch(5% 0.01 43 / 0.28);
+        --focus: 0 0 0 3px oklch(75% 0.11 49 / 0.36);
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-width: 280px;
+      background: var(--canvas);
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.5;
+      text-rendering: optimizeLegibility;
+    }
+
+    button, input, select { font: inherit; }
+
+    button, select, input[type="search"] {
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-small);
+      background: var(--surface);
+      color: var(--ink);
+    }
+
+    button { cursor: pointer; }
+    button:disabled { cursor: wait; opacity: .68; }
+
+    button:hover:not(:disabled), select:hover, input[type="search"]:hover {
+      border-color: var(--accent);
+    }
+
+    a { color: inherit; }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      box-shadow: var(--focus);
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .88em;
+      overflow-wrap: anywhere;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: 12px;
+      z-index: 100;
+      padding: 10px 14px;
+      border-radius: var(--radius-small);
+      background: var(--accent);
+      color: var(--on-accent);
+      transform: translateY(-160%);
+      text-decoration: none;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .app-header {
+      display: grid;
+      grid-template-columns: auto minmax(170px, 1fr) auto auto;
+      align-items: center;
+      gap: 20px;
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 20px 28px 18px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      color: var(--ink);
+      font-size: 17px;
+      font-weight: 730;
+      letter-spacing: -.02em;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .brand svg { width: 30px; height: 30px; flex: none; }
+    .mark-brackets { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .mark-links { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; }
+    .mark-node { fill: var(--accent); }
+
+    .repository { min-width: 0; }
+    .repository strong, .repository code { display: block; }
+    .repository strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .repository code { margin-top: 2px; color: var(--ink-muted); }
+
+    .timestamps {
+      display: flex;
+      gap: 22px;
+      margin: 0;
+    }
+
+    .timestamps div { min-width: 126px; }
+    .timestamps dt { color: var(--ink-muted); font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+    .timestamps dd { margin: 2px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    .refresh-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 15px;
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--on-accent);
+      font-weight: 700;
+    }
+
+    .refresh-button:hover:not(:disabled) { background: var(--accent-hover); color: var(--on-accent); }
+    .refresh-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+    .section-nav-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-block: 1px solid var(--border);
+      background: var(--canvas);
+    }
+
+    .section-nav {
+      display: flex;
+      gap: 5px;
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 7px 28px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .section-nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 0 11px;
+      border-radius: 7px;
+      color: var(--ink-muted);
+      font-size: 13px;
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .section-nav a:hover { background: var(--surface-muted); color: var(--ink); }
+
+    main { max-width: 1480px; margin: 0 auto; padding: 0 28px 64px; }
+
+    .global-notice {
+      margin: 24px 0 0;
+      padding: 14px 16px;
+      border: 1px solid var(--critical);
+      border-radius: var(--radius-small);
+      background: var(--critical-bg);
+      color: var(--critical);
+      font-weight: 650;
+    }
+
+    .dashboard-section {
+      scroll-margin-top: 72px;
+      padding: 38px 0 42px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 19px;
+    }
+
+    .section-heading h1, .section-heading h2 { margin: 0; line-height: 1.15; letter-spacing: -.025em; }
+    .section-heading h1 { font-size: 27px; }
+    .section-heading h2 { font-size: 23px; }
+    .section-heading p { max-width: 70ch; margin: 6px 0 0; color: var(--ink-muted); }
+
+    .project-title { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-muted);
+      color: var(--ink-muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .badge::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      content: "";
+    }
+
+    .badge-valid, .badge-complete, .badge-passed, .badge-current, .badge-matched, .badge-resolved, .badge-confirmed { color: var(--success); background: var(--success-bg); border-color: color-mix(in oklch, var(--success) 35%, var(--border)); }
+    .badge-invalid, .badge-failed, .badge-critical { color: var(--critical); background: var(--critical-bg); border-color: color-mix(in oklch, var(--critical) 35%, var(--border)); }
+    .badge-coverage-incomplete, .badge-high, .badge-stale, .badge-legacy, .badge-persisting { color: var(--high); background: var(--high-bg); border-color: color-mix(in oklch, var(--high) 35%, var(--border)); }
+    .badge-medium, .badge-not-run, .badge-unknown, .badge-planned, .badge-pending, .badge-downgraded { color: var(--medium); background: var(--medium-bg); border-color: color-mix(in oklch, var(--medium) 35%, var(--border)); }
+    .badge-low, .badge-info, .badge-absent, .badge-new, .badge-not-required, .badge-refuted { color: var(--low); background: var(--low-bg); border-color: color-mix(in oklch, var(--low) 35%, var(--border)); }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .status-strip > div { min-width: 0; padding: 16px 17px 17px; border-inline-end: 1px solid var(--border); }
+    .status-strip > div:last-child { border-inline-end: 0; }
+    .status-strip dt { margin-bottom: 8px; color: var(--ink-muted); font-size: 12px; font-weight: 650; letter-spacing: .035em; text-transform: uppercase; }
+    .status-strip dd { margin: 0; font-size: 17px; font-weight: 720; overflow-wrap: anywhere; }
+    .status-strip dd small { display: block; margin-top: 3px; color: var(--ink-muted); font-size: 12px; font-weight: 500; }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, .42fr);
+      gap: 22px;
+      margin-top: 22px;
+    }
+
+    .overview-block, .map-panel, .table-shell, .integrity-panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .overview-block { padding: 19px; }
+    .overview-block h3 { margin: 0 0 12px; font-size: 15px; }
+
+    .attention-list, .compact-list, .evidence-list, .connection-list, .document-list, .integrity-list, .limitation-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .attention-list li, .compact-list li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .attention-list li:first-child, .compact-list li:first-child { padding-top: 0; border-top: 0; }
+    .attention-symbol { color: var(--high); font-weight: 800; }
+    .attention-list strong { display: block; }
+    .attention-list p { margin: 2px 0 0; color: var(--ink-muted); }
+
+    .definition-list { display: grid; grid-template-columns: minmax(110px, .42fr) 1fr; gap: 10px 16px; margin: 0; }
+    .definition-list dt { color: var(--ink-muted); }
+    .definition-list dd { margin: 0; overflow-wrap: anywhere; }
+
+    .tab-list {
+      display: inline-flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-muted);
+    }
+
+    .tab-list button {
+      min-height: 36px;
+      padding: 0 13px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tab-list button[aria-selected="true"] { border-color: var(--border); background: var(--surface); color: var(--ink); box-shadow: 0 2px 7px oklch(30% 0.02 43 / .08); }
+    [role="tabpanel"][hidden] { display: none; }
+
+    .map-panel { padding: 19px; overflow: hidden; }
+    .map-groups { display: grid; grid-auto-columns: minmax(220px, 1fr); grid-auto-flow: column; gap: 14px; overflow-x: auto; padding-bottom: 7px; }
+    .map-group { min-width: 0; }
+    .map-group h3 { margin: 0 0 9px; color: var(--ink-muted); font-size: 12px; letter-spacing: .045em; text-transform: uppercase; }
+    .map-node-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+    .map-node {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-small);
+      background: var(--surface-muted);
+    }
+
+    .map-node summary, .finding-details summary, .document-entry summary {
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .map-node summary::-webkit-details-marker, .finding-details summary::-webkit-details-marker, .document-entry summary::-webkit-details-marker { display: none; }
+
+    .map-node summary { position: relative; padding: 11px 34px 11px 12px; }
+    .map-node summary::after, .finding-details summary::after, .document-entry summary::after { position: absolute; color: var(--ink-muted); content: "+"; font-size: 17px; line-height: 1; }
+    .map-node summary::after { right: 12px; top: 13px; }
+    .map-node[open] summary::after, .finding-details[open] summary::after, .document-entry[open] summary::after { content: "−"; }
+    .node-title { display: block; font-weight: 700; overflow-wrap: anywhere; }
+    .node-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+    .node-body { padding: 0 12px 12px; }
+
+    .connection-heading { margin: 23px 0 10px; font-size: 14px; }
+    .connection-list { display: grid; gap: 7px; }
+    .connection-list li { display: grid; grid-template-columns: minmax(100px, 1fr) auto minmax(80px, auto) auto minmax(100px, 1fr); align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-small); }
+    .connection-list code { font-weight: 650; }
+    .connection-relation { color: var(--ink-muted); font-size: 12px; text-align: center; }
+    .connection-arrow { color: var(--accent); font-weight: 800; }
+    .connection-evidence { grid-column: 1 / -1; color: var(--ink-muted); }
+    .connection-evidence summary { width: fit-content; cursor: pointer; font-size: 12px; font-weight: 700; }
+    .connection-evidence .evidence-list { margin-top: 8px; }
+
+    .project-graph-shell { display: grid; gap: 15px; }
+
+    .graph-toolbar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .graph-toolbar button {
+      min-height: 44px;
+      padding: 0 11px;
+      background: var(--surface-muted);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .graph-toolbar button[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+
+    .graph-toolbar-separator { width: 1px; height: 25px; margin: 0 2px; background: var(--border); }
+
+    .project-graph-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(245px, .32fr);
+      gap: 14px;
+      min-height: 470px;
+    }
+
+    .graph-viewport {
+      position: relative;
+      min-width: 0;
+      min-height: 470px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-small);
+      background: var(--surface-muted);
+    }
+
+    .project-graph-svg {
+      display: block;
+      width: auto;
+      height: auto;
+      min-width: 100%;
+      min-height: 470px;
+      cursor: grab;
+      touch-action: pan-y pinch-zoom;
+      user-select: none;
+    }
+
+    .project-graph-svg.is-fit { width: 100%; height: 100%; }
+
+    .project-graph-svg.is-panning { cursor: grabbing; }
+
+    .graph-lane {
+      fill: color-mix(in oklch, var(--surface) 76%, transparent);
+      stroke: var(--border);
+      stroke-width: 1;
+    }
+
+    .graph-lane-label { fill: var(--ink-muted); font-size: 12px; font-weight: 750; letter-spacing: .055em; text-transform: uppercase; }
+    .graph-lane-count { fill: var(--ink-muted); font-size: 11px; }
+
+    .graph-edge {
+      fill: none;
+      stroke: color-mix(in oklch, var(--ink-muted) 72%, transparent);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .graph-edge-label {
+      fill: var(--ink-muted);
+      stroke: var(--surface-muted);
+      stroke-width: 5px;
+      paint-order: stroke;
+      font-size: 10px;
+      font-weight: 650;
+      pointer-events: none;
+    }
+
+    .graph-edge.is-upstream { stroke: var(--kind-runtime); stroke-dasharray: 3 4; stroke-width: 2; }
+    .graph-edge.is-downstream { stroke: var(--accent); stroke-width: 2.2; }
+    .graph-edge.is-upstream.is-downstream { stroke: var(--kind-component); stroke-dasharray: 8 3 2 3; }
+    .graph-edge.is-route { stroke: var(--critical); stroke-width: 3; stroke-dasharray: none; }
+    .graph-edge.is-muted, .graph-edge-label.is-muted { opacity: .22; }
+    .graph-edge-label.is-route { fill: var(--critical); font-weight: 800; }
+
+    .graph-node { cursor: pointer; }
+    .graph-node .graph-node-outline { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .graph-node[data-status="planned"] .graph-node-outline { stroke-dasharray: 7 5; }
+    .graph-node[data-status="legacy"] .graph-node-outline { stroke-dasharray: 2 3; stroke-width: 2.4; }
+    .graph-node .graph-kind-marker { stroke: var(--surface); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .graph-node[data-kind="surface"] .graph-kind-marker { fill: var(--kind-surface); }
+    .graph-node[data-kind="component"] .graph-kind-marker { fill: var(--kind-component); }
+    .graph-node[data-kind="data"] .graph-kind-marker { fill: var(--kind-data); }
+    .graph-node[data-kind="runtime"] .graph-kind-marker { fill: var(--kind-runtime); }
+    .graph-node[data-kind="external"] .graph-kind-marker { fill: var(--kind-external); }
+    .graph-node[data-kind="other"] .graph-kind-marker { fill: var(--kind-other); }
+    .graph-kind-letter { fill: var(--surface); font-size: 9px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+    .graph-node-label { fill: var(--ink); font-size: 12px; font-weight: 750; pointer-events: none; }
+    .graph-node-id { fill: var(--ink-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 8px; pointer-events: none; }
+    .graph-node-meta { fill: var(--ink-muted); font-size: 9px; font-weight: 650; letter-spacing: .035em; pointer-events: none; }
+    .graph-node.is-selected .graph-node-outline { stroke: var(--accent); stroke-width: 3; }
+    .graph-node.is-upstream .graph-node-outline { stroke: var(--kind-runtime); }
+    .graph-node.is-downstream .graph-node-outline { stroke: var(--accent); }
+    .graph-node.is-upstream.is-downstream .graph-node-outline { stroke: var(--kind-component); stroke-dasharray: 8 3 2 3; }
+    .graph-node.is-route .graph-node-outline { stroke: var(--critical); stroke-width: 3; }
+    .graph-node.is-route-start .graph-node-outline { stroke-dasharray: 8 4; }
+    .graph-node.is-muted { opacity: .38; }
+    .graph-node:focus-visible { outline: none; }
+    .graph-node:focus-visible .graph-node-outline { stroke: var(--accent); stroke-width: 4; }
+
+    .graph-inspector {
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-small);
+      background: var(--surface);
+      overflow: auto;
+    }
+
+    .graph-inspector h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+    .graph-inspector > p { color: var(--ink-muted); }
+    .graph-inspector .node-meta { margin: 9px 0 14px; }
+    .graph-reach { display: grid; grid-template-columns: auto 1fr; gap: 8px 11px; margin: 14px 0; }
+    .graph-reach dt { color: var(--ink-muted); }
+    .graph-reach dd { margin: 0; overflow-wrap: anywhere; }
+    .graph-inspector .evidence-list { margin-top: 8px; }
+
+    .graph-instructions, .graph-receipt { margin: 0; color: var(--ink-muted); font-size: 12px; }
+    .graph-receipt { min-height: 19px; color: var(--ink); font-weight: 650; overflow-wrap: anywhere; }
+
+    .graph-list-fallback {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .graph-list-fallback > summary { width: fit-content; cursor: pointer; color: var(--ink-muted); font-size: 12px; font-weight: 700; }
+    .graph-list-fallback[open] > summary { margin-bottom: 12px; }
+
+    .empty-state {
+      display: grid;
+      place-items: center;
+      min-height: 148px;
+      padding: 28px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-small);
+      color: var(--ink-muted);
+      text-align: center;
+    }
+
+    .empty-state strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .empty-state p { max-width: 58ch; margin: 0; }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: minmax(210px, 1.5fr) repeat(4, minmax(130px, .65fr)) auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 13px;
+    }
+
+    .filter-field { display: grid; gap: 5px; }
+    .filter-field label { color: var(--ink-muted); font-size: 12px; font-weight: 650; }
+    .filter-field input, .filter-field select { width: 100%; padding: 0 11px; }
+    .reset-button { padding: 0 13px; background: var(--surface-muted); font-weight: 650; }
+
+    .filter-result { margin: 0 0 10px; color: var(--ink-muted); font-size: 13px; }
+
+    .table-shell { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    caption { text-align: start; }
+    th, td { padding: 12px 13px; border-bottom: 1px solid var(--border); text-align: start; vertical-align: top; }
+    th { background: var(--surface-muted); color: var(--ink-muted); font-size: 11px; font-weight: 750; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: color-mix(in oklch, var(--surface-muted) 58%, transparent); }
+    .finding-title { min-width: 270px; }
+    .finding-details summary { position: relative; min-height: 24px; padding-right: 26px; font-weight: 700; }
+    .finding-details summary::after { right: 3px; top: 2px; }
+    .finding-id { display: block; margin-top: 4px; color: var(--ink-muted); font-weight: 500; }
+    .finding-body { max-width: 68ch; padding: 12px 0 3px; color: var(--ink-muted); }
+    .finding-body p { margin: 0 0 10px; }
+    .severity-change { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .severity-change .arrow { color: var(--ink-muted); }
+    .evidence-heading { margin: 13px 0 6px; color: var(--ink); font-size: 12px; }
+    .evidence-list { display: grid; gap: 7px; }
+    .evidence-list li { padding: 8px 9px; border-radius: 6px; background: var(--surface-muted); }
+    .evidence-list code { display: block; margin-bottom: 3px; color: var(--ink); }
+
+    .document-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+    .document-group { min-width: 0; }
+    .document-group > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .document-group h3 { margin: 0; font-size: 16px; }
+    .document-count { color: var(--ink-muted); font-size: 12px; }
+    .document-list { border-top: 1px solid var(--border); }
+    .document-entry { border-bottom: 1px solid var(--border); }
+    .document-entry summary { position: relative; min-height: 52px; padding: 13px 30px 12px 0; }
+    .document-entry summary::after { right: 4px; top: 17px; }
+    .document-entry-title { display: block; font-weight: 700; }
+    .document-entry-id { display: block; margin-top: 3px; color: var(--ink-muted); font-size: 12px; }
+    .document-body { padding: 0 10px 14px 0; color: var(--ink-muted); }
+    .document-body p { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+    .history-table td:first-child { min-width: 178px; }
+
+    .integrity-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .38fr); gap: 22px; }
+    .integrity-panel { padding: 18px; }
+    .integrity-panel h3 { margin: 0 0 12px; font-size: 15px; }
+    .integrity-list li { display: grid; grid-template-columns: minmax(140px, .55fr) 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+    .integrity-list li:first-child { padding-top: 0; border-top: 0; }
+    .integrity-label { color: var(--ink-muted); }
+    .integrity-value { overflow-wrap: anywhere; }
+    .limitation-list { display: grid; gap: 9px; }
+    .limitation-list li { padding: 10px 11px; border: 1px solid var(--border); border-radius: var(--radius-small); background: var(--surface-muted); }
+
+    footer { max-width: 1480px; margin: 0 auto; padding: 0 28px 30px; color: var(--ink-muted); font-size: 12px; }
+
+    @media (max-width: 1120px) {
+      .app-header { grid-template-columns: auto minmax(160px, 1fr) auto auto; }
+      .timestamps { grid-column: 1 / -1; grid-row: 2; justify-content: flex-end; }
+      .status-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .status-strip > div:nth-child(3) { border-inline-end: 0; }
+      .status-strip > div:nth-child(-n+3) { border-bottom: 1px solid var(--border); }
+      .filter-bar { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+      .filter-field:first-child { grid-column: span 2; }
+    }
+
+    @media (max-width: 900px) {
+      .overview-grid, .integrity-layout { grid-template-columns: 1fr; }
+      .document-grid { grid-template-columns: 1fr; gap: 30px; }
+      .project-graph-layout { grid-template-columns: 1fr; }
+      .graph-inspector { max-height: 330px; }
+      .connection-list li { grid-template-columns: minmax(80px, 1fr) auto minmax(80px, 1fr); }
+      .connection-relation { grid-column: 1 / -1; grid-row: 2; text-align: start; }
+      .connection-list .connection-arrow:first-of-type { display: none; }
+    }
+
+    @media (max-width: 720px) {
+      .app-header { grid-template-columns: 1fr auto; gap: 12px; padding: 15px 17px; }
+      .brand { grid-column: 1; }
+      .repository { grid-column: 1 / -1; grid-row: 2; }
+      .timestamps { grid-column: 1 / -1; grid-row: 3; justify-content: flex-start; gap: 16px; overflow-x: auto; }
+      .timestamps div { min-width: 138px; }
+      .refresh-form { grid-column: 2; grid-row: 1; }
+      .section-nav { padding-inline: 13px; }
+      main { padding-inline: 17px; }
+      .dashboard-section { padding-block: 30px 34px; }
+      .section-heading { display: block; }
+      .section-heading .tab-list { margin-top: 14px; }
+      .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .status-strip > div { border-bottom: 1px solid var(--border); }
+      .status-strip > div:nth-child(2n) { border-inline-end: 0; }
+      .status-strip > div:nth-last-child(-n+2) { border-bottom: 0; }
+      .filter-bar { grid-template-columns: 1fr; }
+      .filter-field:first-child { grid-column: auto; }
+      .reset-button { width: 100%; }
+      .map-panel { padding: 14px; }
+      .map-groups { grid-auto-columns: minmax(210px, 82vw); }
+      .project-graph-layout, .graph-viewport, .project-graph-svg { min-height: 430px; }
+      .graph-toolbar { gap: 6px; }
+      .graph-toolbar button { flex: 1 1 auto; }
+      .graph-toolbar-separator { display: none; }
+      footer { padding-inline: 17px; }
+    }
+
+    @media (max-width: 430px) {
+      .status-strip { grid-template-columns: 1fr; }
+      .status-strip > div, .status-strip > div:nth-child(2n), .status-strip > div:nth-last-child(-n+2) { border-inline-end: 0; border-bottom: 1px solid var(--border); }
+      .status-strip > div:last-child { border-bottom: 0; }
+      .definition-list, .integrity-list li { grid-template-columns: 1fr; gap: 3px; }
+      .tab-list { width: 100%; }
+      .tab-list button { flex: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+
+    @media (forced-colors: active) {
+      .badge::before { forced-color-adjust: none; }
+      .refresh-button { border: 2px solid ButtonText; }
+      .graph-lane, .graph-edge, .graph-node .graph-node-outline, .graph-node .graph-kind-marker { stroke: CanvasText; }
+      .project-graph-svg .graph-node .graph-kind-marker { fill: Canvas; }
+      .graph-kind-letter, .graph-node-label, .graph-node-id, .graph-node-meta, .graph-edge-label, .graph-lane-label, .graph-lane-count { fill: CanvasText; }
+      .project-graph-svg marker path { fill: CanvasText; }
+      .graph-node.is-selected .graph-node-outline, .graph-node.is-route .graph-node-outline, .graph-edge.is-route { stroke: Highlight; }
+    }
+
+    @media print {
+      .refresh-form, .section-nav-wrap, .filter-bar, .skip-link { display: none; }
+      body { background: Canvas; color: CanvasText; }
+      main { max-width: none; padding: 0; }
+      .dashboard-section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="app-header">
+    <a class="brand" href="#overview" aria-label="Project Context dashboard home">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path class="mark-brackets" d="M10 5H6.5A1.5 1.5 0 0 0 5 6.5v19A1.5 1.5 0 0 0 6.5 27H10M22 5h3.5A1.5 1.5 0 0 1 27 6.5v19a1.5 1.5 0 0 1-1.5 1.5H22"/>
+        <path class="mark-links" d="m12.1 14.9 6.8-3.3M12.1 17.1l6.8 3.3"/>
+        <circle class="mark-node" cx="10" cy="16" r="2.35"/>
+        <circle class="mark-node" cx="21" cy="11" r="2.35"/>
+        <circle class="mark-node" cx="21" cy="21" r="2.35"/>
+      </svg>
+      <span>Project Context</span>
+    </a>
+
+    <div class="repository">
+      <strong id="repository-name">Repository</strong>
+      <code id="repository-revision">Revision unavailable</code>
+    </div>
+
+    <dl class="timestamps">
+      <div>
+        <dt>Data refreshed</dt>
+        <dd><time id="refreshed-at">Not available</time></dd>
+      </div>
+      <div>
+        <dt>Latest audit</dt>
+        <dd><time id="latest-audit-at">Not available</time></dd>
+      </div>
+    </dl>
+
+    <form class="refresh-form" method="get" action="__DASHBOARD_ROUTE__">
+      <button class="refresh-button" id="refresh-button" type="submit" aria-describedby="refresh-help">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 6.8A7 7 0 1 0 17 12M16.4 6.8V2.9m0 3.9h-3.9"/></svg>
+        <span id="refresh-label">Refresh</span>
+      </button>
+      <span id="refresh-help" class="sr-only">Re-reads validated dashboard data. It does not run an audit.</span>
+    </form>
+
+  </header>
+
+  <div class="section-nav-wrap">
+    <nav class="section-nav" aria-label="Dashboard sections">
+      <a href="#overview">Overview</a>
+      <a href="#map">Map</a>
+      <a href="#findings">Findings</a>
+      <a href="#decisions">Decisions &amp; debt</a>
+      <a href="#history">History</a>
+      <a href="#integrity">Integrity</a>
+    </nav>
+  </div>
+
+  <main id="main" tabindex="-1">
+    <div class="global-notice" id="snapshot-error" role="alert" hidden></div>
+
+    <section class="dashboard-section" id="overview" aria-labelledby="overview-title">
+      <header class="section-heading">
+        <div>
+          <div class="project-title">
+            <h1 id="overview-title">Repository overview</h1>
+            <span id="context-state-badge" class="badge badge-unknown">Unknown</span>
+          </div>
+          <p>Validated context, coverage and attention items from the current snapshot.</p>
+        </div>
+      </header>
+      <dl class="status-strip" id="status-strip"></dl>
+      <div class="overview-grid">
+        <section class="overview-block" aria-labelledby="attention-title">
+          <h3 id="attention-title">Needs attention</h3>
+          <ul class="attention-list" id="attention-list"></ul>
+        </section>
+        <section class="overview-block" aria-labelledby="snapshot-title">
+          <h3 id="snapshot-title">Snapshot</h3>
+          <dl class="definition-list" id="snapshot-definition"></dl>
+        </section>
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="map" aria-labelledby="map-title">
+      <header class="section-heading">
+        <div>
+          <h2 id="map-title">Project and context map</h2>
+          <p>Evidence-backed project topology and the validated document graph.</p>
+        </div>
+        <div class="tab-list" role="tablist" aria-label="Map type">
+          <button id="project-map-tab" type="button" role="tab" aria-selected="true" aria-controls="project-map-panel" tabindex="0">Project</button>
+          <button id="context-map-tab" type="button" role="tab" aria-selected="false" aria-controls="context-map-panel" tabindex="-1">Context</button>
+        </div>
+      </header>
+      <div class="map-panel">
+        <div id="project-map-panel" role="tabpanel" aria-labelledby="project-map-tab"></div>
+        <div id="context-map-panel" role="tabpanel" aria-labelledby="context-map-tab" hidden></div>
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="findings" aria-labelledby="findings-title">
+      <header class="section-heading">
+        <div>
+          <h2 id="findings-title">Findings</h2>
+          <p>Original severity, effective severity and independent verification stay visible together.</p>
+        </div>
+      </header>
+
+      <div class="filter-bar" role="search" aria-label="Filter findings">
+        <div class="filter-field">
+          <label for="finding-search">Search</label>
+          <input id="finding-search" type="search" autocomplete="off" placeholder="ID, title, path or evidence">
+        </div>
+        <div class="filter-field">
+          <label for="severity-filter">Severity</label>
+          <select id="severity-filter">
+            <option value="">All severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="auditor-filter">Auditor</label>
+          <select id="auditor-filter"><option value="">All auditors</option></select>
+        </div>
+        <div class="filter-field">
+          <label for="status-filter">Status</label>
+          <select id="status-filter">
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="persisting">Persisting</option>
+            <option value="resolved">Resolved</option>
+            <option value="refuted">Refuted</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="verification-filter">Verification</label>
+          <select id="verification-filter">
+            <option value="">All verification</option>
+            <option value="pending">Pending</option>
+            <option value="not-required">Not required</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="downgraded">Downgraded</option>
+            <option value="refuted">Refuted</option>
+          </select>
+        </div>
+        <button class="reset-button" id="reset-filters" type="button">Reset</button>
+      </div>
+
+      <p class="filter-result"><output id="finding-count" aria-live="polite">0 findings</output></p>
+      <div class="table-shell">
+        <table>
+          <caption class="sr-only">Validated project findings</caption>
+          <thead>
+            <tr>
+              <th scope="col">Severity</th>
+              <th scope="col">Finding</th>
+              <th scope="col">Auditor</th>
+              <th scope="col">Status</th>
+              <th scope="col">Verification</th>
+              <th scope="col">Location</th>
+            </tr>
+          </thead>
+          <tbody id="findings-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="decisions" aria-labelledby="decisions-title">
+      <header class="section-heading">
+        <div>
+          <h2 id="decisions-title">Decisions and debt</h2>
+          <p>Accepted choices, known mismatches and the ordered path to target state.</p>
+        </div>
+      </header>
+      <div class="document-grid">
+        <section class="document-group" aria-labelledby="adr-title">
+          <header><h3 id="adr-title">Decisions</h3><span class="document-count" id="decision-count"></span></header>
+          <div id="decision-list"></div>
+        </section>
+        <section class="document-group" aria-labelledby="debt-title">
+          <header><h3 id="debt-title">Technical debt</h3><span class="document-count" id="debt-count"></span></header>
+          <div id="debt-list"></div>
+        </section>
+        <section class="document-group" aria-labelledby="backlog-title">
+          <header><h3 id="backlog-title">Migration backlog</h3><span class="document-count" id="backlog-count"></span></header>
+          <div id="backlog-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="history" aria-labelledby="history-title">
+      <header class="section-heading">
+        <div>
+          <h2 id="history-title">Audit history</h2>
+          <p>Append-only run metadata. Finding trends are not inferred without per-run snapshots.</p>
+        </div>
+      </header>
+      <div class="table-shell">
+        <table class="history-table">
+          <caption class="sr-only">Project Context audit history</caption>
+          <thead>
+            <tr>
+              <th scope="col">Audit time</th>
+              <th scope="col">Outcome</th>
+              <th scope="col">Revision</th>
+              <th scope="col">Coverage</th>
+              <th scope="col">Unscanned</th>
+              <th scope="col">Blind check</th>
+              <th scope="col">jCodeMunch</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="integrity" aria-labelledby="integrity-title">
+      <header class="section-heading">
+        <div>
+          <h2 id="integrity-title">Integrity</h2>
+          <p>Structural proof and explicit limits. Unknown checks never appear as passing.</p>
+        </div>
+      </header>
+      <div class="integrity-layout">
+        <section class="integrity-panel" aria-labelledby="integrity-checks-title">
+          <h3 id="integrity-checks-title">Checks</h3>
+          <ul class="integrity-list" id="integrity-list"></ul>
+        </section>
+        <section class="integrity-panel" aria-labelledby="limitations-title">
+          <h3 id="limitations-title">Limits and drift</h3>
+          <ul class="limitation-list" id="limitation-list"></ul>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer><span id="footer-text">Local read-only snapshot · Project Context</span></footer>
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
+
+  <script type="application/json" id="snapshot" nonce="__CSP_NONCE__">__SNAPSHOT__</script>
+  <script nonce="__CSP_NONCE__">
+    (() => {
+      "use strict";
+
+      const byId = (id) => document.getElementById(id);
+      const asObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+      const asArray = (value) => Array.isArray(value) ? value : [];
+      const asText = (value, fallback = "") => typeof value === "string" && value.length ? value : fallback;
+      const asCount = (value) => Number.isInteger(value) && value >= 0 ? value : 0;
+      const normalized = (value) => asText(value, "unknown").toLowerCase().replaceAll("_", "-");
+      const allowedBadge = new Set(["valid", "invalid", "absent", "complete", "coverage-incomplete", "failed", "passed", "not-run", "current", "matched", "stale", "unknown", "critical", "high", "medium", "low", "legacy", "planned", "info", "new", "persisting", "resolved", "refuted", "confirmed", "downgraded", "pending", "not-required"]);
+      const severityOrder = new Map([["critical", 4], ["high", 3], ["medium", 2], ["low", 1]]);
+      const lifecycleOrder = new Map([["new", 0], ["persisting", 1], ["resolved", 2], ["refuted", 3]]);
+
+      function make(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined && text !== null) element.textContent = String(text);
+        return element;
+      }
+
+      function badge(value, label) {
+        const state = normalized(value);
+        const element = make("span", "badge", label || state.replaceAll("-", " "));
+        element.classList.add(`badge-${allowedBadge.has(state) ? state : "unknown"}`);
+        return element;
+      }
+
+      function titleCase(value) {
+        return asText(value, "Unknown").replaceAll("-", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+      }
+
+      const dateFormatter = new Intl.DateTimeFormat(undefined, {dateStyle: "medium", timeStyle: "short"});
+
+      function formatDate(value) {
+        const text = asText(value);
+        if (!text) return "Not available";
+        const date = new Date(text);
+        return Number.isNaN(date.valueOf()) ? text : dateFormatter.format(date);
+      }
+
+      function setTime(id, value) {
+        const element = byId(id);
+        const text = asText(value);
+        element.textContent = formatDate(text);
+        if (text) {
+          element.dateTime = text;
+          element.title = text;
+        } else {
+          element.removeAttribute("datetime");
+          element.removeAttribute("title");
+        }
+      }
+
+      function setBadge(element, value, label) {
+        const next = badge(value, label);
+        element.className = next.className;
+        element.textContent = next.textContent;
+      }
+
+      function emptyState(title, copy) {
+        const wrapper = make("div", "empty-state");
+        const content = make("div");
+        content.append(make("strong", "", title), make("p", "", copy));
+        wrapper.append(content);
+        return wrapper;
+      }
+
+      function safeEvidence(value) {
+        return asArray(value).map((raw) => {
+          const item = asObject(raw);
+          return {
+            path: asText(item.path, "Unknown path"),
+            line: Number.isInteger(item.line) && item.line > 0 ? item.line : null,
+            detail: asText(item.detail, "No detail recorded")
+          };
+        });
+      }
+
+      function evidenceList(items) {
+        const list = make("ul", "evidence-list");
+        safeEvidence(items).forEach((item) => {
+          const row = make("li");
+          row.append(make("code", "", `${item.path}${item.line ? `:${item.line}` : ""}`));
+          row.append(make("span", "", item.detail));
+          list.append(row);
+        });
+        return list;
+      }
+
+      function addDefinition(list, term, description, useCode = false) {
+        list.append(make("dt", "", term));
+        const definition = make("dd");
+        definition.append(make(useCode ? "code" : "span", "", description));
+        list.append(definition);
+      }
+
+      let snapshot;
+      try {
+        snapshot = JSON.parse(byId("snapshot").textContent);
+        if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) throw new Error("Snapshot is not an object");
+      } catch (_) {
+        snapshot = {};
+        const error = byId("snapshot-error");
+        error.textContent = "The dashboard snapshot could not be parsed. No project data was rendered.";
+        error.hidden = false;
+      }
+
+      const project = asObject(snapshot.project);
+      const context = asObject(snapshot.context);
+      const audit = asObject(snapshot.audit);
+      const latestAudit = asObject(audit.latest);
+      const integrity = asObject(snapshot.integrity);
+      const documents = asObject(snapshot.documents);
+      const findings = asArray(snapshot.findings).map((raw) => asObject(raw));
+
+      function currentSeverity(finding) {
+        const verification = asObject(finding.verification);
+        return normalized(finding.effective_severity || verification.resulting_severity || finding.source_severity || finding.severity);
+      }
+
+      function sourceSeverity(finding) {
+        return normalized(finding.source_severity || finding.severity || currentSeverity(finding));
+      }
+
+      function verificationStatus(finding) {
+        return normalized(asObject(finding.verification).status);
+      }
+
+      function isActive(finding) {
+        return finding.status === "new" || finding.status === "persisting";
+      }
+
+      function renderHeader() {
+        byId("repository-name").textContent = asText(project.name, "Repository");
+        const revision = asText(project.short_revision) || (asText(project.revision) ? project.revision.slice(0, 10) : "");
+        const branch = asText(project.branch);
+        byId("repository-revision").textContent = [branch, revision].filter(Boolean).join(" · ") || "Revision unavailable";
+        setTime("refreshed-at", snapshot.generated_at);
+        setTime("latest-audit-at", latestAudit.scanned_at);
+        const version = asText(context.skill_version || snapshot.skill_version);
+        byId("footer-text").textContent = `Local read-only snapshot · Project Context${version ? ` v${version}` : ""}`;
+        document.title = `${asText(project.name, "Repository")} · Project Context`;
+      }
+
+      function statusMetric(term, value, detail, state) {
+        const wrapper = make("div");
+        wrapper.append(make("dt", "", term));
+        const definition = make("dd");
+        if (state) definition.append(badge(state, value));
+        else definition.append(document.createTextNode(value));
+        if (detail) definition.append(make("small", "", detail));
+        wrapper.append(definition);
+        return wrapper;
+      }
+
+      function renderOverview() {
+        const contextState = normalized(context.state || integrity.status);
+        setBadge(byId("context-state-badge"), contextState, titleCase(contextState));
+        byId("overview-title").textContent = asText(project.name, "Repository overview");
+
+        const coverage = asObject(latestAudit.coverage);
+        const required = asArray(coverage.required);
+        const completed = asArray(coverage.completed);
+        const active = findings.filter(isActive);
+        const activeCritical = active.filter((finding) => currentSeverity(finding) === "critical");
+        const activeHigh = active.filter((finding) => currentSeverity(finding) === "high");
+        const blind = normalized(asObject(latestAudit.verification).blind);
+        const revisionState = normalized(project.revision_state);
+
+        const strip = byId("status-strip");
+        strip.replaceChildren(
+          statusMetric("Integrity", titleCase(contextState), asText(context.error), contextState),
+          statusMetric("Audit", titleCase(latestAudit.outcome), asText(latestAudit.id), latestAudit.outcome),
+          statusMetric("Coverage", `${completed.length} / ${required.length}`, required.length ? "required auditors" : "not recorded"),
+          statusMetric("Active findings", String(active.length), `${findings.length} total`),
+          statusMetric("Critical / high", `${activeCritical.length} / ${activeHigh.length}`, "effective severity"),
+          statusMetric("Blind check", titleCase(blind), asCount(asObject(latestAudit.verification).issues) ? `${asCount(asObject(latestAudit.verification).issues)} issues` : "", blind)
+        );
+
+        const attention = [];
+        if (contextState === "invalid") attention.push(["Integrity is invalid", asText(context.error, "Validated project context is unavailable.")]);
+        if (contextState === "absent") attention.push(["Context is not installed", "No validated Project Context artifacts were found."]);
+        if (latestAudit.outcome && latestAudit.outcome !== "complete") attention.push(["Audit coverage is incomplete", `Latest outcome: ${titleCase(latestAudit.outcome)}.`]);
+        const unscanned = asArray(asObject(latestAudit.scope).unscanned);
+        if (unscanned.length) attention.push(["Unscanned scope remains", `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`]);
+        if (blind === "failed") attention.push(["Blind verification failed", `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`]);
+        if (blind === "not-run") attention.push(["Blind verification was not run", "Factual completeness was not independently checked for this run."]);
+        active.filter((finding) => ["critical", "high"].includes(currentSeverity(finding))).slice(0, 5).forEach((finding) => {
+          attention.push([asText(finding.title, asText(finding.id, "High-severity finding")), `${titleCase(currentSeverity(finding))} · ${asText(finding.id, "unknown id")}`]);
+        });
+
+        const attentionList = byId("attention-list");
+        attentionList.replaceChildren();
+        if (!attention.length) {
+          const item = make("li");
+          item.append(make("span", "attention-symbol", "✓"));
+          const copy = make("div");
+          copy.append(make("strong", "", "No validated attention items"), make("p", "", "This snapshot reports complete coverage and no active high-severity findings."));
+          item.append(copy);
+          attentionList.append(item);
+        } else {
+          attention.forEach(([title, detail]) => {
+            const item = make("li");
+            item.append(make("span", "attention-symbol", "!"));
+            const copy = make("div");
+            copy.append(make("strong", "", title), make("p", "", detail));
+            item.append(copy);
+            attentionList.append(item);
+          });
+        }
+
+        const definitions = byId("snapshot-definition");
+        definitions.replaceChildren();
+        addDefinition(definitions, "Source", titleCase(latestAudit.source_state || snapshot.source_state));
+        addDefinition(definitions, "Audit run", asText(latestAudit.id, "Not available"), true);
+        addDefinition(definitions, "HEAD state", titleCase(revisionState));
+        addDefinition(definitions, "Layout", titleCase(context.layout));
+        addDefinition(definitions, "Hosts", asArray(context.hosts).join(", ") || "None recorded");
+        addDefinition(definitions, "Domains", asArray(context.domains).join(", ") || "None recorded");
+      }
+
+      function renderMap(target, rawModel, emptyTitle, emptyCopy, defaultGroup = "") {
+        const model = asObject(rawModel);
+        const nodes = asArray(model.nodes).map((raw) => asObject(raw));
+        const edges = asArray(model.edges).map((raw) => asObject(raw));
+        target.replaceChildren();
+        if (!nodes.length) {
+          target.append(emptyState(emptyTitle, emptyCopy));
+          return;
+        }
+
+        const nodeLabel = (node) => asText(node.label || node.path, asText(node.id, "Unknown node"));
+        const displayNodeLabel = (node) => defaultGroup && node.id ? `${nodeLabel(node)} [${asText(node.id)}]` : nodeLabel(node);
+        const nodeGroup = (node) => {
+          if (node.group) return node.group;
+          if (defaultGroup) return defaultGroup;
+          const path = asText(node.path);
+          if (node.kind === "managed_block") return "Hosts";
+          if (path.includes("/audit/findings/")) return "Findings";
+          if (path.startsWith("repodocs/audit/")) return "Audit";
+          if (["repodocs/decisions.md", "repodocs/LegacyWarning.md", "repodocs/migration-backlog.md"].includes(path)) return "Decisions and debt";
+          if (path === "PROJECT_CONTEXT.md") return "Canonical context";
+          return "Guidance";
+        };
+        const labels = new Map(nodes.map((node) => [asText(node.id), displayNodeLabel(node)]));
+        const groups = new Map();
+        nodes.forEach((node) => {
+          const group = asText(nodeGroup(node), defaultGroup || "Ungrouped");
+          if (!groups.has(group)) groups.set(group, []);
+          groups.get(group).push(node);
+        });
+
+        const groupRoot = make("div", "map-groups");
+        [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([group, groupNodes]) => {
+          const section = make("section", "map-group");
+          section.append(make("h3", "", group));
+          const list = make("ul", "map-node-list");
+          groupNodes.sort((a, b) => displayNodeLabel(a).localeCompare(displayNodeLabel(b))).forEach((node) => {
+            const item = make("li");
+            const details = make("details", "map-node");
+            const summary = make("summary");
+            summary.append(make("span", "node-title", displayNodeLabel(node)));
+            const meta = make("span", "node-meta");
+            meta.append(badge("info", titleCase(node.kind)));
+            if (node.status) meta.append(badge(node.status, titleCase(node.status)));
+            summary.append(meta);
+            details.append(summary);
+            const body = make("div", "node-body");
+            const evidence = safeEvidence(node.evidence);
+            if (evidence.length) body.append(evidenceList(evidence));
+            else if (node.path) body.append(make("code", "", node.path));
+            else body.append(make("p", "", "No evidence recorded."));
+            details.append(body);
+            item.append(details);
+            list.append(item);
+          });
+          section.append(list);
+          groupRoot.append(section);
+        });
+        target.append(groupRoot);
+
+        if (edges.length) {
+          target.append(make("h3", "connection-heading", `Connections (${edges.length})`));
+          const list = make("ol", "connection-list");
+          edges.forEach((edge) => {
+            const item = make("li");
+            const source = asText(edge.from || edge.source);
+            const targetNode = asText(edge.to || edge.target);
+            const relation = asText(edge.label, edge.fragment ? `links to #${edge.fragment}` : "links to");
+            item.append(make("code", "", labels.get(source) || source || "Unknown"));
+            item.append(make("span", "connection-arrow", "→"));
+            item.append(make("span", "connection-relation", relation));
+            item.append(make("span", "connection-arrow", "→"));
+            item.append(make("code", "", labels.get(targetNode) || targetNode || "Unknown"));
+            const edgeEvidence = safeEvidence(edge.evidence);
+            if (edgeEvidence.length) {
+              const details = make("details", "connection-evidence");
+              details.append(make("summary", "", `${edgeEvidence.length} evidence item${edgeEvidence.length === 1 ? "" : "s"}`));
+              details.append(evidenceList(edgeEvidence));
+              item.append(details);
+            }
+            list.append(item);
+          });
+          target.append(list);
+        }
+      }
+
+      function renderProjectGraph(target, rawModel) {
+        const model = asObject(rawModel);
+        const nodes = asArray(model.nodes).map((raw) => asObject(raw));
+        const nodeById = new Map(nodes.map((node) => [asText(node.id), node]));
+        const edges = asArray(model.edges).map((raw, index) => {
+          const edge = asObject(raw);
+          const from = asText(edge.from);
+          const to = asText(edge.to);
+          const label = asText(edge.label, "connects to");
+          return {
+            ...edge,
+            from,
+            to,
+            label,
+            key: JSON.stringify([from, to, label]),
+            index
+          };
+        }).filter((edge) => nodeById.has(edge.from) && nodeById.has(edge.to));
+        const compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
+        const orderedEdges = [...edges].sort((left, right) => compareText(left.from, right.from) || compareText(left.to, right.to) || compareText(left.label, right.label));
+        orderedEdges.forEach((edge, channelIndex) => { edge.channelIndex = channelIndex; });
+
+        target.replaceChildren();
+        if (!nodes.length) {
+          target.append(emptyState("Project map not available", "No evidence-backed project map was included in this validated snapshot."));
+          return;
+        }
+
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const NODE_WIDTH = 190;
+        const NODE_HEIGHT = 66;
+        const ROW_GAP = 26;
+        const COLUMN_GAP = 22;
+        const LANE_GAP = 32;
+        const LANE_PADDING = 18;
+        const EDGE_CHANNEL_GAP = 18;
+        // ponytail: one header channel per authored edge keeps MVP routing unambiguous; bundle only if dense-map height becomes a measured problem.
+        const LANE_HEADER = 82 + Math.max(1, orderedEdges.length) * EDGE_CHANNEL_GAP;
+        const ROUTE_GUTTER = 100;
+        const OUTER_PADDING = 24;
+        const MAX_ROWS = 8;
+        const kindNames = new Set(["surface", "component", "data", "runtime", "external", "other"]);
+        const statusNames = new Set(["current", "planned", "legacy"]);
+        const kindLetters = {surface: "S", component: "C", data: "D", runtime: "R", external: "E", other: "·"};
+        const nodeLabel = (node) => asText(node.label, asText(node.id, "Unknown node"));
+        const nodeReference = (node) => {
+          const label = nodeLabel(node);
+          const id = asText(node.id);
+          return id && id !== label ? `${label} [${id}]` : label;
+        };
+        const nodeKind = (node) => kindNames.has(normalized(node.kind)) ? normalized(node.kind) : "other";
+        const nodeStatus = (node) => statusNames.has(normalized(node.status)) ? normalized(node.status) : "current";
+        const svgMake = (tag, attributes = {}, text) => {
+          const element = document.createElementNS(SVG_NS, tag);
+          Object.entries(attributes).forEach(([name, value]) => element.setAttribute(name, String(value)));
+          if (text !== undefined) element.textContent = String(text);
+          return element;
+        };
+        const truncate = (value, length) => value.length > length ? `${value.slice(0, Math.max(1, length - 1))}…` : value;
+
+        const groups = new Map();
+        nodes.forEach((node) => {
+          const group = asText(node.group, "Ungrouped");
+          if (!groups.has(group)) groups.set(group, []);
+          groups.get(group).push(node);
+        });
+
+        const lanes = [];
+        const positions = new Map();
+        let laneX = OUTER_PADDING;
+        let maximumRows = 1;
+        [...groups.entries()].sort(([left], [right]) => compareText(left, right)).forEach(([group, groupNodes], groupIndex) => {
+          groupNodes.sort((left, right) => compareText(nodeLabel(left), nodeLabel(right)) || compareText(asText(left.id), asText(right.id)));
+          const rows = Math.min(MAX_ROWS, Math.max(1, groupNodes.length));
+          const columns = Math.max(1, Math.ceil(groupNodes.length / MAX_ROWS));
+          const width = Math.max(226, LANE_PADDING * 2 + columns * NODE_WIDTH + (columns - 1) * COLUMN_GAP + ROUTE_GUTTER);
+          maximumRows = Math.max(maximumRows, rows);
+          lanes.push({group, groupIndex, nodes: groupNodes, x: laneX, width});
+          groupNodes.forEach((node, index) => {
+            const column = Math.floor(index / MAX_ROWS);
+            const row = index % MAX_ROWS;
+            const x = laneX + LANE_PADDING + column * (NODE_WIDTH + COLUMN_GAP);
+            const corridorWidth = column === columns - 1 ? ROUTE_GUTTER : COLUMN_GAP;
+            positions.set(asText(node.id), {
+              x,
+              y: OUTER_PADDING + LANE_HEADER + row * (NODE_HEIGHT + ROW_GAP),
+              width: NODE_WIDTH,
+              height: NODE_HEIGHT,
+              groupIndex,
+              routeStartX: x + NODE_WIDTH + 4,
+              routeEndX: x + NODE_WIDTH + corridorWidth - 4
+            });
+          });
+          laneX += width + LANE_GAP;
+        });
+        const graphWidth = Math.max(560, laneX - LANE_GAP + OUTER_PADDING);
+        const graphHeight = Math.max(420, OUTER_PADDING * 2 + LANE_HEADER + maximumRows * NODE_HEIGHT + (maximumRows - 1) * ROW_GAP);
+
+        const shell = make("div", "project-graph-shell");
+        const toolbar = make("div", "graph-toolbar");
+        toolbar.setAttribute("role", "toolbar");
+        toolbar.setAttribute("aria-label", "Project map controls");
+        const graphButton = (label, ariaLabel = label) => {
+          const button = make("button", "", label);
+          button.type = "button";
+          button.setAttribute("aria-label", ariaLabel);
+          return button;
+        };
+        const routeButton = graphButton("Trace route", "Select a route start and destination");
+        routeButton.setAttribute("aria-pressed", "false");
+        const zoomOutButton = graphButton("Zoom −", "Zoom out");
+        const zoomInButton = graphButton("Zoom +", "Zoom in");
+        const fitButton = graphButton("Fit", "Fit all project map nodes");
+        const resetButton = graphButton("Reset", "Reset project map view and selection");
+        const toolbarSeparator = make("span", "graph-toolbar-separator");
+        toolbarSeparator.setAttribute("aria-hidden", "true");
+        toolbar.append(routeButton, toolbarSeparator, zoomOutButton, zoomInButton, fitButton, resetButton);
+        shell.append(toolbar);
+
+        const layout = make("div", "project-graph-layout");
+        const viewport = make("div", "graph-viewport");
+        const svg = svgMake("svg", {
+          class: "project-graph-svg",
+          width: graphWidth,
+          height: graphHeight,
+          viewBox: `0 0 ${graphWidth} ${graphHeight}`,
+          preserveAspectRatio: "xMidYMid meet",
+          tabindex: "0",
+          role: "group",
+          "aria-label": `Project map with ${nodes.length} nodes and ${edges.length} authored directed connections`,
+          "aria-describedby": "project-graph-description project-graph-instructions project-graph-receipt"
+        });
+        svg.append(svgMake("title", {}, "Interactive evidence-backed Project Map"));
+        svg.append(svgMake("desc", {id: "project-graph-description"}, "Authored directed topology from the validated snapshot. Connections are shown only when present in that snapshot; no links are inferred."));
+        const definitions = svgMake("defs");
+        const marker = svgMake("marker", {id: "project-map-arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse", markerUnits: "strokeWidth"});
+        marker.append(svgMake("path", {d: "M 0 0 L 10 5 L 0 10 z", fill: "var(--ink-muted)"}));
+        definitions.append(marker);
+        svg.append(definitions);
+        const laneLayer = svgMake("g", {"aria-hidden": "true"});
+        const edgeLayer = svgMake("g", {"aria-hidden": "true"});
+        const nodeLayer = svgMake("g");
+        svg.append(laneLayer, edgeLayer, nodeLayer);
+        viewport.append(svg);
+
+        const inspector = make("aside", "graph-inspector");
+        inspector.setAttribute("aria-label", "Selected project map node");
+        layout.append(viewport, inspector);
+        shell.append(layout);
+
+        const instructions = make("p", "graph-instructions", "Select a node for authored upstream and downstream reach. Trace route, then choose start and destination. Drag empty space to pan; use the controls or +, − and 0 while the map is focused.");
+        instructions.id = "project-graph-instructions";
+        const receipt = make("p", "graph-receipt");
+        receipt.id = "project-graph-receipt";
+        receipt.setAttribute("role", "status");
+        receipt.setAttribute("aria-live", "polite");
+        shell.append(instructions, receipt);
+
+        const fallback = make("details", "graph-list-fallback");
+        fallback.append(make("summary", "", "Accessible list view"));
+        const fallbackRoot = make("div");
+        renderMap(fallbackRoot, model, "Project map not available", "No evidence-backed project map was included in this validated snapshot.", "Ungrouped");
+        fallback.append(fallbackRoot);
+        shell.append(fallback);
+        target.append(shell);
+
+        lanes.forEach((lane) => {
+          laneLayer.append(svgMake("rect", {class: "graph-lane", x: lane.x, y: OUTER_PADDING, width: lane.width, height: graphHeight - OUTER_PADDING * 2, rx: "12"}));
+          laneLayer.append(svgMake("text", {class: "graph-lane-label", x: lane.x + LANE_PADDING, y: OUTER_PADDING + 23}, truncate(lane.group, 34)));
+          laneLayer.append(svgMake("text", {class: "graph-lane-count", x: lane.x + LANE_PADDING, y: OUTER_PADDING + 41}, `${lane.nodes.length} node${lane.nodes.length === 1 ? "" : "s"}`));
+        });
+
+        function edgeGeometry(edge) {
+          const source = positions.get(edge.from);
+          const destination = positions.get(edge.to);
+          const sourceY = source.y + source.height / 2;
+          const destinationY = destination.y + destination.height / 2;
+          const sourceX = source.x + source.width;
+          const destinationX = destination.x + destination.width;
+          const channelY = OUTER_PADDING + 72 + edge.channelIndex * EDGE_CHANNEL_GAP;
+          return {
+            d: `M ${sourceX} ${sourceY} H ${source.routeStartX} V ${channelY} H ${destination.routeEndX} V ${destinationY} H ${destinationX}`,
+            labelX: (source.routeStartX + destination.routeEndX) / 2,
+            labelY: channelY - 5
+          };
+        }
+
+        const edgeElements = new Map();
+        orderedEdges.forEach((edge) => {
+          const geometry = edgeGeometry(edge);
+          const path = svgMake("path", {class: "graph-edge", d: geometry.d, "marker-end": "url(#project-map-arrow)"});
+          path.append(svgMake("title", {}, `${nodeReference(nodeById.get(edge.from))} to ${nodeReference(nodeById.get(edge.to))}: ${edge.label}`));
+          const label = svgMake("text", {class: "graph-edge-label", x: geometry.labelX, y: geometry.labelY}, truncate(edge.label, 24));
+          edgeLayer.append(path, label);
+          edgeElements.set(edge.key, {path, label, edge});
+        });
+
+        const sortedNodeIds = [...positions.entries()].sort(([, left], [, right]) => left.x - right.x || left.y - right.y).map(([id]) => id);
+        const nodeElements = new Map();
+        sortedNodeIds.forEach((id, index) => {
+          const node = nodeById.get(id);
+          const position = positions.get(id);
+          const kind = nodeKind(node);
+          const status = nodeStatus(node);
+          const group = svgMake("g", {
+            class: "graph-node",
+            transform: `translate(${position.x} ${position.y})`,
+            tabindex: index === 0 ? "0" : "-1",
+            role: "button",
+            "aria-pressed": "false",
+            "aria-label": `${nodeReference(node)}, ${titleCase(kind)}, ${titleCase(status)}. Press Enter to select.`,
+            "data-kind": kind,
+            "data-status": status
+          });
+          group.append(svgMake("title", {}, `${nodeReference(node)} · ${titleCase(kind)} · ${titleCase(status)}`));
+          group.append(svgMake("rect", {class: "graph-node-outline", x: "0", y: "0", width: NODE_WIDTH, height: NODE_HEIGHT, rx: "10"}));
+          group.append(svgMake("circle", {class: "graph-kind-marker", cx: "19", cy: "22", r: "10"}));
+          group.append(svgMake("text", {class: "graph-kind-letter", x: "19", y: "25"}, kindLetters[kind]));
+          group.append(svgMake("text", {class: "graph-node-label", x: "36", y: "18"}, truncate(nodeLabel(node), 24)));
+          group.append(svgMake("text", {class: "graph-node-id", x: "36", y: "35"}, truncate(asText(node.id, "Unknown id"), 27)));
+          group.append(svgMake("text", {class: "graph-node-meta", x: "36", y: "52"}, `${titleCase(kind)} · ${status.toUpperCase()}`));
+          nodeLayer.append(group);
+          nodeElements.set(id, group);
+        });
+
+        const forward = new Map(nodes.map((node) => [asText(node.id), []]));
+        const reverse = new Map(nodes.map((node) => [asText(node.id), []]));
+        edges.forEach((edge) => {
+          forward.get(edge.from).push({neighbor: edge.to, edge});
+          reverse.get(edge.to).push({neighbor: edge.from, edge});
+        });
+        for (const adjacency of [forward, reverse]) {
+          adjacency.forEach((entries) => entries.sort((left, right) => compareText(left.neighbor, right.neighbor) || compareText(left.edge.label, right.edge.label) || left.edge.index - right.edge.index));
+        }
+
+        function authoredReach(start, adjacency) {
+          const reached = new Set();
+          const usedEdges = new Set();
+          const queue = [start];
+          for (let index = 0; index < queue.length; index += 1) {
+            for (const step of adjacency.get(queue[index]) || []) {
+              usedEdges.add(step.edge.key);
+              if (step.neighbor === start || reached.has(step.neighbor)) continue;
+              reached.add(step.neighbor);
+              queue.push(step.neighbor);
+            }
+          }
+          return {nodes: reached, edges: usedEdges};
+        }
+
+        function shortestDirectedPath(start, destination) {
+          if (start === destination) return {nodes: [start], edges: []};
+          const queue = [start];
+          const visited = new Set([start]);
+          const previous = new Map();
+          for (let index = 0; index < queue.length; index += 1) {
+            const current = queue[index];
+            for (const step of forward.get(current) || []) {
+              if (visited.has(step.neighbor)) continue;
+              visited.add(step.neighbor);
+              previous.set(step.neighbor, {node: current, edge: step.edge});
+              if (step.neighbor === destination) {
+                const pathNodes = [destination];
+                const pathEdges = [];
+                let cursor = destination;
+                while (cursor !== start) {
+                  const prior = previous.get(cursor);
+                  pathEdges.unshift(prior.edge);
+                  cursor = prior.node;
+                  pathNodes.unshift(cursor);
+                }
+                return {nodes: pathNodes, edges: pathEdges};
+              }
+              queue.push(step.neighbor);
+            }
+          }
+          return null;
+        }
+
+        const receiptReference = asText(latestAudit.id)
+          ? `run ${latestAudit.id}`
+          : asText(snapshot.snapshot_id)
+            ? `snapshot ${snapshot.snapshot_id}`
+            : "current snapshot";
+        const receiptSuffix = ` · ${receiptReference}. Snapshot topology only; no additional factual verification.`;
+        const announce = (message, persist = true) => {
+          if (persist) receipt.textContent = `${message}${receiptSuffix}`;
+          byId("announcer").textContent = message;
+        };
+
+        let selectedId = null;
+        let routePicking = false;
+        let routeStart = null;
+        let routeDestination = null;
+        let routeResult = null;
+
+        function selectedReach() {
+          return selectedId
+            ? {upstream: authoredReach(selectedId, reverse), downstream: authoredReach(selectedId, forward)}
+            : {upstream: {nodes: new Set(), edges: new Set()}, downstream: {nodes: new Set(), edges: new Set()}};
+        }
+
+        function renderInspector() {
+          inspector.replaceChildren();
+          if (!selectedId || !nodeById.has(selectedId)) {
+            inspector.append(make("h3", "", "Select a node"));
+            inspector.append(make("p", "", "Selection shows evidence and reach through authored directed edges only."));
+            return;
+          }
+          const node = nodeById.get(selectedId);
+          const reach = selectedReach();
+          inspector.append(make("h3", "", nodeLabel(node)));
+          const meta = make("div", "node-meta");
+          meta.append(badge("info", titleCase(nodeKind(node))), badge(nodeStatus(node), titleCase(nodeStatus(node))));
+          inspector.append(meta);
+          const definitions = make("dl", "graph-reach");
+          const upstreamNames = [...reach.upstream.nodes].map((id) => nodeReference(nodeById.get(id))).sort(compareText);
+          const downstreamNames = [...reach.downstream.nodes].map((id) => nodeReference(nodeById.get(id))).sort(compareText);
+          addDefinition(definitions, "ID", asText(node.id, "Not available"), true);
+          addDefinition(definitions, `Upstream (${upstreamNames.length})`, upstreamNames.join(", ") || "None authored");
+          addDefinition(definitions, `Downstream (${downstreamNames.length})`, downstreamNames.join(", ") || "None authored");
+          addDefinition(definitions, "Group", asText(node.group, "Ungrouped"));
+          inspector.append(definitions);
+          const evidence = safeEvidence(node.evidence);
+          inspector.append(make("h4", "evidence-heading", `Evidence (${evidence.length})`));
+          inspector.append(evidence.length ? evidenceList(evidence) : make("p", "", "No node evidence recorded."));
+        }
+
+        function updateGraphState() {
+          const reach = selectedReach();
+          const routeNodeIds = new Set(routeResult ? routeResult.nodes : [routeStart, routeDestination].filter(Boolean));
+          const routeEdgeIds = new Set(routeResult ? routeResult.edges.map((edge) => edge.key) : []);
+          nodeElements.forEach((element, id) => {
+            const upstream = reach.upstream.nodes.has(id);
+            const downstream = reach.downstream.nodes.has(id);
+            const onRoute = routeNodeIds.has(id);
+            const related = !selectedId || id === selectedId || upstream || downstream;
+            element.classList.toggle("is-selected", id === selectedId);
+            element.classList.toggle("is-upstream", upstream);
+            element.classList.toggle("is-downstream", downstream);
+            element.classList.toggle("is-route", onRoute);
+            element.classList.toggle("is-route-start", id === routeStart);
+            element.classList.toggle("is-muted", routeDestination ? !onRoute : routePicking ? false : !related);
+            element.setAttribute("aria-pressed", String(id === selectedId));
+          });
+          edgeElements.forEach(({path, label, edge}, key) => {
+            const upstream = reach.upstream.edges.has(key);
+            const downstream = reach.downstream.edges.has(key);
+            const onRoute = routeEdgeIds.has(key);
+            const related = !selectedId || upstream || downstream;
+            for (const element of [path, label]) {
+              element.classList.toggle("is-upstream", upstream);
+              element.classList.toggle("is-downstream", downstream);
+              element.classList.toggle("is-route", onRoute);
+              element.classList.toggle("is-muted", routeDestination ? !onRoute : routePicking ? false : !related);
+            }
+          });
+          renderInspector();
+        }
+
+        function normalSelection(id) {
+          selectedId = id;
+          routeStart = null;
+          routeDestination = null;
+          routeResult = null;
+          const reach = selectedReach();
+          updateGraphState();
+          announce(`${nodeReference(nodeById.get(id))} selected. Authored reach: ${reach.upstream.nodes.size} upstream, ${reach.downstream.nodes.size} downstream`);
+        }
+
+        function chooseRouteNode(id) {
+          if (!routeStart) {
+            routeStart = id;
+            routeDestination = null;
+            routeResult = null;
+            selectedId = id;
+            updateGraphState();
+            announce(`Route start ${nodeReference(nodeById.get(id))} selected. Choose a destination`);
+            return;
+          }
+          routeDestination = id;
+          routeResult = shortestDirectedPath(routeStart, routeDestination);
+          selectedId = id;
+          routePicking = false;
+          routeButton.setAttribute("aria-pressed", "false");
+          routeButton.textContent = "Trace route";
+          updateGraphState();
+          if (!routeResult) {
+            announce(`No directed route is authored from ${nodeReference(nodeById.get(routeStart))} to ${nodeReference(nodeById.get(routeDestination))}`);
+            return;
+          }
+          const labels = routeResult.nodes.map((nodeId) => nodeReference(nodeById.get(nodeId)));
+          announce(`Shortest authored directed route: ${labels.join(" → ")} (${routeResult.edges.length} edge${routeResult.edges.length === 1 ? "" : "s"})`);
+        }
+
+        function activateNode(id) {
+          if (routePicking) chooseRouteNode(id);
+          else normalSelection(id);
+        }
+
+        let rovingIndex = 0;
+        const moveNodeFocus = (nextIndex, focus = true) => {
+          nodeElements.get(sortedNodeIds[rovingIndex]).setAttribute("tabindex", "-1");
+          rovingIndex = nextIndex;
+          const next = nodeElements.get(sortedNodeIds[rovingIndex]);
+          next.setAttribute("tabindex", "0");
+          if (focus) next.focus();
+        };
+
+        sortedNodeIds.forEach((id, index) => {
+          const element = nodeElements.get(id);
+          element.addEventListener("click", (event) => {
+            event.stopPropagation();
+            moveNodeFocus(index, false);
+            activateNode(id);
+          });
+          element.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              activateNode(id);
+              return;
+            }
+            if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
+            const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? sortedNodeIds.length - 1 : (index + direction + sortedNodeIds.length) % sortedNodeIds.length;
+            moveNodeFocus(nextIndex);
+          });
+        });
+
+        const baseView = {x: 0, y: 0, width: graphWidth, height: graphHeight};
+        let view = {...baseView};
+        const setView = () => svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.width} ${view.height}`);
+        const fitView = (announceFit = true) => {
+          view = {...baseView};
+          setView();
+          if (announceFit) announce("Project map fitted to all authored nodes", false);
+        };
+        const zoom = (factor, anchorX = .5, anchorY = .5, announceZoom = true) => {
+          const nextWidth = Math.min(baseView.width * 4, Math.max(baseView.width * .2, view.width * factor));
+          const nextHeight = view.height * (nextWidth / view.width);
+          const focusX = view.x + view.width * anchorX;
+          const focusY = view.y + view.height * anchorY;
+          view = {
+            x: focusX - nextWidth * anchorX,
+            y: focusY - nextHeight * anchorY,
+            width: nextWidth,
+            height: nextHeight
+          };
+          setView();
+          if (announceZoom) announce(`Project map zoom ${Math.round(baseView.width / view.width * 100)} percent`, false);
+        };
+
+        zoomOutButton.addEventListener("click", () => zoom(1.22));
+        zoomInButton.addEventListener("click", () => zoom(.82));
+        fitButton.addEventListener("click", () => {
+          svg.classList.add("is-fit");
+          fitView();
+        });
+        resetButton.addEventListener("click", () => {
+          selectedId = null;
+          routePicking = false;
+          routeStart = null;
+          routeDestination = null;
+          routeResult = null;
+          routeButton.setAttribute("aria-pressed", "false");
+          routeButton.textContent = "Trace route";
+          svg.classList.remove("is-fit");
+          fitView(false);
+          updateGraphState();
+          announce(`Project Map reset with ${nodes.length} authored nodes and ${edges.length} authored connections`);
+        });
+        routeButton.addEventListener("click", () => {
+          routePicking = !routePicking;
+          routeStart = null;
+          routeDestination = null;
+          routeResult = null;
+          routeButton.setAttribute("aria-pressed", String(routePicking));
+          routeButton.textContent = routePicking ? "Cancel route" : "Trace route";
+          updateGraphState();
+          announce(routePicking ? "Route tracing started. Choose a start node" : "Route tracing canceled");
+        });
+
+        let drag = null;
+        svg.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0 || (event.target instanceof Element && event.target.closest(".graph-node"))) return;
+          drag = {pointerId: event.pointerId, x: event.clientX, y: event.clientY, view: {...view}};
+          svg.setPointerCapture(event.pointerId);
+          svg.classList.add("is-panning");
+        });
+        svg.addEventListener("pointermove", (event) => {
+          if (!drag || event.pointerId !== drag.pointerId) return;
+          const bounds = svg.getBoundingClientRect();
+          if (!bounds.width || !bounds.height) return;
+          view.x = drag.view.x - (event.clientX - drag.x) * drag.view.width / bounds.width;
+          view.y = drag.view.y - (event.clientY - drag.y) * drag.view.height / bounds.height;
+          setView();
+        });
+        const stopPan = (event) => {
+          if (!drag || event.pointerId !== drag.pointerId) return;
+          drag = null;
+          svg.classList.remove("is-panning");
+          if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+        };
+        svg.addEventListener("pointerup", stopPan);
+        svg.addEventListener("pointercancel", stopPan);
+        svg.addEventListener("keydown", (event) => {
+          if (event.target !== svg) return;
+          const stepX = view.width * .08;
+          const stepY = view.height * .08;
+          if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+            event.preventDefault();
+            if (event.key === "ArrowLeft") view.x -= stepX;
+            if (event.key === "ArrowRight") view.x += stepX;
+            if (event.key === "ArrowUp") view.y -= stepY;
+            if (event.key === "ArrowDown") view.y += stepY;
+            setView();
+          } else if (event.key === "+" || event.key === "=") {
+            event.preventDefault();
+            zoom(.82);
+          } else if (event.key === "-") {
+            event.preventDefault();
+            zoom(1.22);
+          } else if (event.key === "0") {
+            event.preventDefault();
+            fitView();
+          }
+        });
+
+        updateGraphState();
+        announce(`Project Map loaded: ${nodes.length} authored nodes and ${edges.length} authored directed connections`);
+      }
+
+      function renderMaps() {
+        renderProjectGraph(byId("project-map-panel"), snapshot.project_map);
+        renderMap(byId("context-map-panel"), snapshot.context_map, "Context map not available", "No validated manifest and wikilink graph was included in this snapshot.");
+
+        const tabs = [byId("project-map-tab"), byId("context-map-tab")];
+        const panels = [byId("project-map-panel"), byId("context-map-panel")];
+        const activate = (index, focus = false) => {
+          tabs.forEach((tab, tabIndex) => {
+            const selected = tabIndex === index;
+            tab.setAttribute("aria-selected", String(selected));
+            tab.tabIndex = selected ? 0 : -1;
+            panels[tabIndex].hidden = !selected;
+          });
+          if (focus) tabs[index].focus();
+        };
+        tabs.forEach((tab, index) => {
+          tab.addEventListener("click", () => activate(index));
+          tab.addEventListener("keydown", (event) => {
+            if (!new Set(["ArrowLeft", "ArrowRight", "Home", "End"]).has(event.key)) return;
+            event.preventDefault();
+            const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+            activate(next, true);
+          });
+        });
+        if (!asArray(asObject(snapshot.project_map).nodes).length && asArray(asObject(snapshot.context_map).nodes).length) activate(1);
+      }
+
+      const findingRows = [];
+
+      function severityDisplay(finding) {
+        const source = sourceSeverity(finding);
+        const effective = currentSeverity(finding);
+        const wrapper = make("div", "severity-change");
+        wrapper.append(badge(source, titleCase(source)));
+        if (source !== effective) {
+          wrapper.append(make("span", "arrow", "→"), badge(effective, titleCase(effective)));
+        }
+        return wrapper;
+      }
+
+      function renderFindingBody(finding) {
+        const body = make("div", "finding-body");
+        const identity = asObject(finding.identity);
+        if (identity.assertion) body.append(make("p", "", identity.assertion));
+        const verification = asObject(finding.verification);
+        if (verification.note) body.append(make("p", "", `Verification: ${verification.note}`));
+        const evidence = safeEvidence(finding.evidence);
+        if (evidence.length) {
+          body.append(make("h4", "evidence-heading", "Evidence"), evidenceList(evidence));
+        }
+        const counter = safeEvidence(verification.counterevidence);
+        if (counter.length) {
+          body.append(make("h4", "evidence-heading", "Counterevidence"), evidenceList(counter));
+        }
+        return body;
+      }
+
+      function renderFindings() {
+        const body = byId("findings-body");
+        body.replaceChildren();
+        findingRows.length = 0;
+
+        const auditors = [...new Set(findings.map((finding) => asText(finding.auditor)).filter(Boolean))].sort();
+        const auditorFilter = byId("auditor-filter");
+        auditors.forEach((auditor) => {
+          const option = make("option", "", titleCase(auditor));
+          option.value = auditor;
+          auditorFilter.append(option);
+        });
+
+        findings.sort((a, b) => {
+          const lifecycle = (lifecycleOrder.get(normalized(a.status)) ?? 9) - (lifecycleOrder.get(normalized(b.status)) ?? 9);
+          if (lifecycle) return lifecycle;
+          const severity = (severityOrder.get(currentSeverity(b)) ?? 0) - (severityOrder.get(currentSeverity(a)) ?? 0);
+          if (severity) return severity;
+          return asText(a.id).localeCompare(asText(b.id));
+        }).forEach((finding) => {
+          const row = document.createElement("tr");
+          const severityCell = document.createElement("td");
+          severityCell.append(severityDisplay(finding));
+
+          const titleCell = make("td", "finding-title");
+          const details = make("details", "finding-details");
+          const summary = make("summary", "", asText(finding.title, asText(finding.id, "Untitled finding")));
+          summary.append(make("code", "finding-id", asText(finding.id, "Unknown id")));
+          details.append(summary, renderFindingBody(finding));
+          titleCell.append(details);
+
+          const auditorCell = make("td", "", titleCase(finding.auditor));
+          const statusCell = document.createElement("td");
+          statusCell.append(badge(finding.status, titleCase(finding.status)));
+          const verificationCell = document.createElement("td");
+          verificationCell.append(badge(verificationStatus(finding), titleCase(verificationStatus(finding))));
+          const identity = asObject(finding.identity);
+          const locationCell = document.createElement("td");
+          locationCell.append(make("code", "", asText(identity.path, "Unknown path")));
+          if (identity.symbol) locationCell.append(make("div", "", identity.symbol));
+
+          row.append(severityCell, titleCell, auditorCell, statusCell, verificationCell, locationCell);
+          body.append(row);
+          findingRows.push({
+            row,
+            search: row.textContent.toLocaleLowerCase(),
+            severity: currentSeverity(finding),
+            auditor: asText(finding.auditor),
+            status: normalized(finding.status),
+            verification: verificationStatus(finding)
+          });
+        });
+
+        if (!findingRows.length) {
+          const row = document.createElement("tr");
+          const cell = make("td", "", "No findings were included in this validated snapshot.");
+          cell.colSpan = 6;
+          row.append(cell);
+          body.append(row);
+        }
+        applyFindingFilters();
+      }
+
+      function applyFindingFilters() {
+        const query = byId("finding-search").value.trim().toLocaleLowerCase();
+        const severity = byId("severity-filter").value;
+        const auditor = byId("auditor-filter").value;
+        const status = byId("status-filter").value;
+        const verification = byId("verification-filter").value;
+        let shown = 0;
+        findingRows.forEach((item) => {
+          const visible = (!query || item.search.includes(query)) && (!severity || item.severity === severity) && (!auditor || item.auditor === auditor) && (!status || item.status === status) && (!verification || item.verification === verification);
+          item.row.hidden = !visible;
+          if (visible) shown += 1;
+        });
+        byId("finding-count").textContent = `${shown} shown of ${findingRows.length}`;
+      }
+
+      function wireFindingFilters() {
+        ["finding-search", "severity-filter", "auditor-filter", "status-filter", "verification-filter"].forEach((id) => {
+          byId(id).addEventListener(id === "finding-search" ? "input" : "change", applyFindingFilters);
+        });
+        byId("reset-filters").addEventListener("click", () => {
+          ["finding-search", "severity-filter", "auditor-filter", "status-filter", "verification-filter"].forEach((id) => { byId(id).value = ""; });
+          applyFindingFilters();
+          byId("finding-search").focus();
+        });
+      }
+
+      function documentEntry(raw, fallbackTitle) {
+        const entry = asObject(raw);
+        const details = make("details", "document-entry");
+        const summary = make("summary");
+        summary.append(make("span", "document-entry-title", asText(entry.title || entry.heading, fallbackTitle)));
+        const identity = [asText(entry.id), asText(entry.path), Number.isInteger(entry.line) ? `line ${entry.line}` : ""].filter(Boolean).join(" · ");
+        if (identity) summary.append(make("span", "document-entry-id", identity));
+        details.append(summary);
+        const body = make("div", "document-body");
+        const content = Array.isArray(entry.lines) ? entry.lines : Array.isArray(entry.body) ? entry.body : [entry.body || entry.details || entry.summary].filter(Boolean);
+        content.forEach((line) => body.append(make("p", "", typeof line === "string" ? line : JSON.stringify(line))));
+        if (!content.length) body.append(make("p", "", "No summary text was recorded."));
+        details.append(body);
+        return details;
+      }
+
+      function renderDocumentGroup(listId, countId, entries, emptyTitle, emptyCopy) {
+        const target = byId(listId);
+        const values = asArray(entries);
+        byId(countId).textContent = `${values.length} ${values.length === 1 ? "item" : "items"}`;
+        target.replaceChildren();
+        if (!values.length) {
+          target.append(emptyState(emptyTitle, emptyCopy));
+          return;
+        }
+        const list = make("div", "document-list");
+        values.forEach((entry) => list.append(documentEntry(entry, "Untitled entry")));
+        target.append(list);
+      }
+
+      function renderDocuments() {
+        renderDocumentGroup("decision-list", "decision-count", documents.decisions, "No decisions recorded", "The validated decisions document contains no structured ADR sections.");
+        renderDocumentGroup("debt-list", "debt-count", documents.debt, "No technical debt recorded", "The validated debt document contains no structured entries.");
+        renderDocumentGroup("backlog-list", "backlog-count", documents.backlog, "No migration items recorded", "The validated migration backlog contains no structured entries.");
+      }
+
+      function coverageText(run) {
+        const coverage = asObject(run.coverage);
+        return `${asArray(coverage.completed).length} / ${asArray(coverage.required).length}`;
+      }
+
+      function renderHistory() {
+        const body = byId("history-body");
+        body.replaceChildren();
+        const history = asArray(audit.history).length ? asArray(audit.history) : (Object.keys(latestAudit).length ? [latestAudit] : []);
+        history.forEach((raw) => {
+          const run = asObject(raw);
+          const row = document.createElement("tr");
+          const timeCell = document.createElement("td");
+          const time = document.createElement("time");
+          time.textContent = formatDate(run.scanned_at);
+          if (run.scanned_at) time.dateTime = run.scanned_at;
+          timeCell.append(time);
+          const outcomeCell = document.createElement("td");
+          outcomeCell.append(badge(run.outcome, titleCase(run.outcome)));
+          const revision = asText(run.revision);
+          const revisionCell = make("td");
+          revisionCell.append(make("code", "", revision ? revision.slice(0, 10) : "Unknown"));
+          const unscanned = asArray(asObject(run.scope).unscanned).length;
+          const verification = asObject(run.verification);
+          const blindCell = document.createElement("td");
+          blindCell.append(badge(verification.blind, titleCase(verification.blind)));
+          row.append(
+            timeCell,
+            outcomeCell,
+            revisionCell,
+            make("td", "", coverageText(run)),
+            make("td", "", String(unscanned)),
+            blindCell,
+            make("td", "", titleCase(asObject(run.tools).jcodemunch))
+          );
+          body.append(row);
+        });
+        if (!history.length) {
+          const row = document.createElement("tr");
+          const cell = make("td", "", "No audit history was included in this snapshot.");
+          cell.colSpan = 7;
+          row.append(cell);
+          body.append(row);
+        }
+      }
+
+      function integrityRow(label, value, state) {
+        const item = make("li");
+        item.append(make("span", "integrity-label", label));
+        const result = make("span", "integrity-value");
+        if (state) result.append(badge(state, value));
+        else result.textContent = value;
+        item.append(result);
+        return item;
+      }
+
+      function renderIntegrity() {
+        const list = byId("integrity-list");
+        list.replaceChildren();
+        const state = normalized(integrity.status || context.state);
+        list.append(integrityRow("Overall", titleCase(state), state));
+        list.append(integrityRow("Artifacts", String(asCount(integrity.artifacts))));
+        list.append(integrityRow("Wikilinks", String(asCount(integrity.wikilinks))));
+        list.append(integrityRow("Hosts", asArray(context.hosts).join(", ") || "None recorded"));
+        list.append(integrityRow("Domains", asArray(context.domains).join(", ") || "None recorded"));
+        list.append(integrityRow("Audit run", asText(latestAudit.id, "Not evaluated")));
+        asArray(integrity.checks).forEach((raw) => {
+          const check = asObject(raw);
+          list.append(integrityRow(asText(check.label || check.name, "Check"), asText(check.value || check.status, "Not evaluated"), check.status));
+        });
+
+        const limits = byId("limitation-list");
+        limits.replaceChildren();
+        const values = [...asArray(integrity.limitations), ...asArray(documents.drift)];
+        if (context.error) values.unshift(context.error);
+        if (!values.length) {
+          limits.append(make("li", "", "No explicit verification limits were recorded."));
+        } else {
+          values.forEach((raw) => {
+            if (typeof raw === "string") limits.append(make("li", "", raw));
+            else {
+              const value = asObject(raw);
+              limits.append(make("li", "", [asText(value.title || value.heading), asText(value.summary || value.body || value.details)].filter(Boolean).join(": ") || "Unspecified limit"));
+            }
+          });
+        }
+      }
+
+      function wireRefresh() {
+        const form = document.querySelector(".refresh-form");
+        const button = byId("refresh-button");
+        const label = byId("refresh-label");
+        form.addEventListener("submit", () => {
+          button.disabled = true;
+          button.setAttribute("aria-busy", "true");
+          label.textContent = "Refreshing…";
+          byId("announcer").textContent = "Refreshing validated dashboard data.";
+        });
+        window.addEventListener("pageshow", () => {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+          label.textContent = "Refresh";
+        });
+      }
+
+      renderHeader();
+      renderOverview();
+      renderMaps();
+      renderFindings();
+      wireFindingFilters();
+      renderDocuments();
+      renderHistory();
+      renderIntegrity();
+      wireRefresh();
+    })();
+  </script>
+</body>
+</html>

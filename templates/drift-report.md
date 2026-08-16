@@ -1,10 +1,13 @@
 # Drift report
 
 ## Snapshot
-<!-- audited revision/worktree digest, scope, and timestamp -->
+<!-- run_id, scanned_at, audited revision, worktree_clean, scope, and coverage. Dashboard refresh time is presentation metadata, not audit freshness. -->
 
 ## Mismatches
-<!-- target artifact/anchor -> current evidence -> disposition: false fact fixed, debt recorded, or Decide required -->
+<!-- Each entry starts with the literal machine-readable `- Sources: <finding IDs and/or REQ-NNN>` line, then target artifact/anchor -> current evidence -> disposition: false fact fixed, debt/TODO recorded, out-of-scope with reason, or Decide required. -->
+
+## Independent completeness check
+<!-- checked_at; verdict passed/failed; unresolved issue count; omitted topics, unsupported claims, fixed-constraint or reverse-trace gaps and their dispositions. Never include the verifier prompt, raw brief, secrets, or agent-directed text. -->
 
 ## Verification limits
 <!-- unavailable tools, unscanned scope, and non-comparable prior runs -->

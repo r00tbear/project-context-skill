@@ -1,7 +1,10 @@
 interface:
   display_name: "Project Context"
-  short_description: "Build shared context for Claude Code and Codex"
-  default_prompt: "Use $project-context to audit this repository and create shared project guidance for Claude Code and Codex."
+  short_description: "Audit repos and explore Project Context visually"
+  icon_small: "./assets/project-context-icon.svg"
+  icon_large: "./assets/project-context-logo.svg"
+  brand_color: "#BD5734"
+  default_prompt: "Use $project-context to audit or refresh this repository's shared context, verify it, and open the local Project Context dashboard."
 
 policy:
   allow_implicit_invocation: true

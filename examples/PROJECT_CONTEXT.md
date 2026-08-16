@@ -10,6 +10,7 @@ Maple is an in-process library that normalizes text deterministically. It has no
 
 ## Context map
 
+- [[project_map]]
 - [[context#stack]]
 - [[context#architecture]]
 - [[context#security]]

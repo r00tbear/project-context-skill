@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "skill_version": "0.2.1",
+  "skill_version": "0.3.0",
   "config_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "domains": ["architecture", "stack", "security", "testing"],
   "hosts": ["claude", "codex"],
@@ -14,6 +14,7 @@
     {"id": "decisions", "path": "repodocs/decisions.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
     {"id": "legacy_warning", "path": "repodocs/LegacyWarning.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
     {"id": "migration_backlog", "path": "repodocs/migration-backlog.md", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+    {"id": "project_map", "path": "repodocs/project-map.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
     {"id": "finding_stack", "path": "repodocs/audit/findings/stack.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
     {"id": "finding_architecture", "path": "repodocs/audit/findings/architecture.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
     {"id": "finding_bloat", "path": "repodocs/audit/findings/bloat.json", "kind": "owned_file", "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},

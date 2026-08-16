@@ -12,8 +12,9 @@ It is deliberately technology-neutral. A project may be a library, CLI/TUI, serv
 4. **Wire** - make Claude Code and Codex read that same context while preserving host-specific instructions.
 5. **Verify** - validate generated ownership, hashes, host blocks, and wikilinks.
 6. **Review** - check a diff/branch/PR against trusted project policy with an independent adversarial pass.
+7. **Explore** - open a branded, local, read-only dashboard for the project map, findings, decisions, debt, audit history, integrity, and freshness.
 
-High and critical audit candidates are not accepted at face value: a fresh independent agent must try to disprove or reproduce them before they influence decisions.
+High and critical audit candidates are not accepted at face value: a fresh independent agent must try to disprove or reproduce them before they influence decisions. A separate blind final verifier receives candidate context without findings or the generation summary and must pass before the manifest becomes valid.
 
 ## Shared Claude + Codex model
 
@@ -32,9 +33,9 @@ The skill never creates lowercase `agents.md`, never writes generated files into
 
 ## Install
 
-Current release: `v0.2.1`.
+Current release: `v0.3.0`.
 
-This version intentionally provides no migration or backward compatibility. Before installing, archive anything you need and remove old `project-context` payloads/adapters so only one same-name installation remains. Do not bulk-delete a project `docs/` directory: v0.2 starts clean and writes only to `repodocs/`.
+This version intentionally provides no migration or backward compatibility, including from v0.2 project artifacts. Before installing, archive anything you need and remove old `project-context` payloads/adapters and generated context so only one same-name installation and one fresh v0.3 context remain. Do not bulk-delete a hand-authored project `docs/` directory: v0.3 writes only to `repodocs/`.
 
 Requirements: Git and Python 3.11+.
 
@@ -44,7 +45,7 @@ Install the canonical payload under `.agents` and copy only the Claude adapter:
 
 ```bash
 mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills/project-context"
-git clone --branch v0.2.1 --depth 1 \
+git clone --branch v0.3.0 --depth 1 \
   https://github.com/r00tbear/project-context-skill.git \
   "$HOME/.agents/skills/project-context"
 cp "$HOME/.agents/skills/project-context/templates/host/claude-skill-adapter.md" \
@@ -64,7 +65,7 @@ mkdir -p .agents/skills .claude/skills/project-context
 git submodule add \
   https://github.com/r00tbear/project-context-skill.git \
   .agents/skills/project-context
-git -C .agents/skills/project-context checkout v0.2.1
+git -C .agents/skills/project-context checkout v0.3.0
 cp .agents/skills/project-context/templates/host/claude-skill-adapter.md \
   .claude/skills/project-context/SKILL.md
 ```
@@ -104,6 +105,18 @@ Preflight -> Audit -> Decide -> Generate -> Wire -> Verify
 
 An empty repository uses a short requirements interview before Decide. Review mode is read-only: it reads a trusted base policy, inspects `git diff`, and asks a fresh independent agent to challenge would-fail findings. It does not need a custom headless model runner.
 
+Open the local dashboard from the exact Git root:
+
+```bash
+python3 <skill-root>/scripts/project_context.py dashboard --repo .
+```
+
+It opens the browser by default; pass `--no-open` to keep only the local process. The dashboard uses Project Context branding and reads only normalized, validated artifacts. Its Refresh button re-reads those artifacts without running Audit or writing the repository. `Data refreshed` is the view snapshot time; `Latest audit` remains the latest inventory `scanned_at`.
+
+Project Map is browser-native SVG over validated `project-map.json`. It supports node focus with evidence, upstream/downstream reach across authored edges, exact directed-route search, zoom/fit, and an accessible list fallback. These views explain recorded topology; they never infer impact, missing links, or new relationships.
+
+Source freshness is `current` only when the audited revision matches the current revision and both audited/current source worktrees are clean. A changed revision or a dirty current source tree after a clean audit is `stale`; a missing revision, unknown state, or dirty audited worktree is `unknown`. Dashboard refresh never changes that result.
+
 ## Generated layout
 
 ```text
@@ -118,6 +131,7 @@ repodocs/
   CurrentSprint.md                  # optional shared coordination ledger
   LegacyWarning.md
   migration-backlog.md
+  project-map.json                   # evidence-backed current/planned nodes and edges
   techstack.md
   architecture.md
   security.md
@@ -132,7 +146,7 @@ repodocs/
 
 Compact layout folds target-state topics into `PROJECT_CONTEXT.md`; operational, decision, debt, and audit files stay separate.
 
-The skill previews writes, preserves bytes outside managed host blocks, writes the manifest last, and never stages generated project files automatically.
+The skill previews writes, preserves bytes outside managed host blocks, runs a blind factual-completeness pass, writes the manifest last, and never stages generated project files automatically. Every audit run binds inventory, findings, and the project map through one `run_id`; accepted findings and fixed Greenfield constraints receive a governance disposition, and normative target rules link back to their ADR.
 
 ## jCodeMunch
 
@@ -142,7 +156,7 @@ This release was verified with jCodeMunch `v1.108.210`, where repository-scoped 
 
 ## Safety
 
-Audit and Review treat repository content as untrusted data. They do not follow embedded instructions or execute project code, hooks, package managers, builds, tests, linters, plugins, or generators without explicit approval. Heuristics and index summaries are navigation signals, never findings by themselves.
+Audit, Review, and Dashboard treat repository content as untrusted data. They do not follow embedded instructions or execute project code, hooks, package managers, builds, tests, linters, plugins, or generators without explicit approval. The dashboard binds locally, exposes no arbitrary repository files or mutation endpoints, and makes no external requests. Heuristics and index summaries are navigation signals, never findings by themselves.
 
 ## Validate this skill
 

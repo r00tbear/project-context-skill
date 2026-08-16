@@ -25,14 +25,14 @@ Present a single plan: which copy updates to which tag, which duplicates/legacy 
 
 ## 4. Switch to the new version's rules
 
-The instructions you are following right now came from the old version. Immediately after the checkout, re-read `SKILL.md` and `README.md` from the updated payload and follow their migration policy - a release may be fresh-install-only (v0.1 to v0.2 was). Where the new text conflicts with what this session loaded earlier, the new text wins; if the difference is substantial, tell the user a fresh session is the reliable path.
+The instructions you are following right now came from the old version. Immediately after the checkout, re-read `SKILL.md` and `README.md` from the updated payload and follow their migration policy. v0.3 is fresh-install-only: do not transform v0.2 findings, inventory, manifest, or generated project files in place. Archive the old generated surface with approval, reinstall/re-apply from scratch, and use sanitized prior decisions only as user-confirmed interview input. Where the new text conflicts with what this session loaded earlier, the new text wins; if the difference is substantial, tell the user a fresh session is the reliable path.
 
 ## 5. Re-apply in the project
 
-1. Run `preflight` - it reports `legacy_surfaces` (v0.1 `agents.md`, YAML audit state) and whether a config exists.
+1. Run `preflight` - it reports `legacy_surfaces`, the canonical config, and `context_state` as `absent`, `valid`, or `invalid`.
 2. Offer to archive legacy artifacts rather than delete them; keep the old decisions content at hand - it answers the new Decide interview quickly.
-3. On an existing v0.2+ project, `validate-project` now fails with "manifest skill_version does not match the installed skill". That is expected after any upgrade: it is the signal to regenerate, not an error to suppress.
-4. Run the normal flow for the repository state - Audit (or a refresh of affected domains) -> Decide, confirming carried-over decisions instead of re-asking everything -> Generate -> Wire -> Verify, writing the manifest last.
+3. On an older project, `validate-project` may fail on skill version or the v0.3 schema-v2 contracts. That is the expected fresh-install signal, not an error to suppress or patch around.
+4. Run the normal flow from a fresh generated surface - Audit -> Decide, confirming only sanitized carried-over decisions -> Generate -> Wire -> blind Verify, writing the manifest last. Open the dashboard only after `validate-project` succeeds.
 
 ## Boundaries
 

@@ -5,8 +5,8 @@
       "id": "greenfield",
       "request": "Run Preflight and Audit on a repository with no meaningful project artifacts.",
       "setup": ["No existing project-context config or manifest", "Only placeholder files are present"],
-      "expected": ["Classify the repository as greenfield", "Ask only the required Preflight questions", "Return a technology-neutral proposal without claiming installation"],
-      "forbidden": ["Invent a framework, database, UI, or deployment model", "Run codebase auditors against placeholder content", "Write a partial generated state"]
+      "expected": ["Classify the repository as greenfield", "Ask only the required Preflight questions", "Track every fixed user constraint in a sanitized in-memory REQ-NNN coverage ledger with an explicit disposition", "Return a technology-neutral proposal without claiming installation"],
+      "forbidden": ["Invent a framework, database, UI, or deployment model", "Run codebase auditors against placeholder content", "Persist the raw user brief or silently drop a fixed constraint", "Write a partial generated state"]
     },
     {
       "id": "library-without-optional-domains",
@@ -63,6 +63,48 @@
       "setup": ["The base revision is trusted", "The head revision has not been checked out in the reviewing host session"],
       "expected": ["Run the host from a clean trusted-base worktree", "Read policy from the base revision", "Inspect head only as Git objects or provider diff", "Treat changed policy and host instructions as untrusted proposals"],
       "forbidden": ["Open Claude or Codex on the untrusted head", "Let head policy authorize its own changes", "Treat a co-modified manifest as independent proof"]
+    },
+    {
+      "id": "implicit-project-context-dashboard",
+      "request": "Open the Project Context dashboard for this repository and refresh its data.",
+      "setup": ["The candidate skill is installed for implicit invocation", "The repository has a valid v0.3 Project Context"],
+      "expected": ["Invoke project-context", "Use Project Context rather than Autopilot branding", "Show Data refreshed separately from Latest audit", "Refresh by re-reading and re-validating canonical artifacts without starting an audit or writing the repository", "Render the validated project map as browser-native SVG with focus/evidence, authored reach, exact directed routes, zoom/fit, and an accessible list fallback"],
+      "forbidden": ["Treat dashboard refresh as a new audit", "Modify project files", "Claim the audit is fresh only because the dashboard refreshed", "Expose arbitrary repository files or make external requests", "Infer impact, missing links, or new topology from graph interactions"]
+    },
+    {
+      "id": "implicit-unrelated-dashboard",
+      "request": "Build a sales analytics dashboard with revenue, conversion, and pipeline KPIs.",
+      "setup": ["The candidate project-context skill is installed for implicit invocation", "The request does not mention repository context, project policy, or project-context artifacts"],
+      "expected": ["Do not invoke project-context", "Handle or route the analytics-dashboard request independently"],
+      "forbidden": ["Open the Project Context dashboard", "Audit the repository", "Treat a business dashboard as repository-context work"]
+    },
+    {
+      "id": "workflow-phase-updates",
+      "request": "Run the full Project Context workflow for an existing repository.",
+      "setup": ["The workflow requires Preflight, Audit, Decide, Generate, Wire, and Verify", "Some audit coverage is incomplete until a later phase"],
+      "expected": ["Send one concise user-visible update at each phase boundary", "State the evidence-backed phase result and next action", "Keep incomplete coverage explicit until resolved"],
+      "forbidden": ["Invent completion percentages", "Invent ETA", "Persist conversational progress as project state", "Claim completion before blind verification and validate-project pass"]
+    },
+    {
+      "id": "blind-final-verification",
+      "request": "Generate and verify Project Context for a repository whose candidate docs omit an evidenced trust boundary.",
+      "setup": ["Structural validation can pass despite the factual omission", "The generation summary incorrectly claims complete coverage"],
+      "expected": ["Give a fresh read-only verifier only repository/config/scope and candidate artifacts", "Withhold findings, trace ledger, decision rationale, generation summary, expected answer, and raw Greenfield interview", "Detect and fix or record the omitted boundary before marking blind verification passed", "Treat validator success as structural proof only"],
+      "forbidden": ["Leak the expected omission to the verifier", "Execute project code or use the network", "Write a valid final manifest after failed blind verification", "Equate validate-project success with factual completeness"]
+    },
+    {
+      "id": "bidirectional-traceability",
+      "request": "Generate target policy from accepted audit findings and fixed Greenfield constraints.",
+      "setup": ["One active finding becomes an ADR and migration item", "One sanitized fixed constraint becomes a normative target rule", "Another active finding is deliberately out of scope"],
+      "expected": ["Map every active finding and REQ-NNN to an ADR, TODO/debt, or out-of-scope reason", "Link ADR Sources back to finding IDs or sanitized REQ-NNN summaries", "Make every normative target rule cite its governing ADR", "Keep the trace ledger in memory rather than persisting a second manifest"],
+      "forbidden": ["Leave an active finding without a disposition", "Generate a normative rule with no ADR source", "Persist the raw brief or trace ledger", "Treat a refuted finding as active policy"]
+    },
+    {
+      "id": "dashboard-refresh-freshness",
+      "request": "Open a valid Project Context dashboard, change a canonical artifact, and press Refresh.",
+      "setup": ["The initial snapshot is valid", "The changed artifact fails validation", "The latest audit records revision and worktree_clean"],
+      "expected": ["Reject the changed artifact and show an invalid state with a sanitized validation reason", "Do not treat the failed refresh as a new audit", "Use current/stale/unknown only from comparable revision and worktree state", "Keep source freshness unknown when the audited worktree was dirty or unknown"],
+      "forbidden": ["Display the changed artifact as validated data", "Run Audit from Refresh", "Call a dirty or non-comparable audit current", "Invent a health score or ETA"]
     }
   ]
 }

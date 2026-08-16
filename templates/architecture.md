@@ -9,7 +9,7 @@
 <!-- module/package/process/layer/deployment unit or other domain-native boundary → what it owns → what it must not do -->
 
 ## Structure map
-<!-- the most useful representation for this project: folder/package tree, process or data-flow map, plugin/extension map, deployment units, hardware targets, or a concise combination -->
+<!-- summarize the evidence-backed [[project_map]] using the most useful representation for this project: folder/package tree, process or data-flow map, plugin/extension map, deployment units, hardware targets, or a concise combination. Never invent a node or edge. -->
 
 ## Creation and placement rules
 <!-- naming, tests/verification placement, entry points, extension points, and generated/owned zones only where applicable -->
@@ -19,4 +19,4 @@
 
 ## Interaction and dependency constraints
 
-Related: [[context]] · [[techstack]] · [[decisions]]
+Related: [[context]] · [[project_map]] · [[techstack]] · [[decisions]]

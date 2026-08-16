@@ -5,16 +5,22 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import stat
 import subprocess
 import sys
-from datetime import datetime
+import webbrowser
+from datetime import datetime, timezone
+from html.parser import HTMLParser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
+from urllib.parse import urlsplit
 
 
 CONFIG_PATH = "repodocs/project-context.config.json"
 MANIFEST_PATH = "repodocs/project-context.manifest.json"
+PROJECT_MAP_PATH = "repodocs/project-map.json"
 AUDITORS = {
     "stack",
     "architecture",
@@ -45,6 +51,8 @@ ARTIFACT_KINDS = {"owned_file", "managed_block"}
 SEVERITIES = {"low", "medium", "high", "critical"}
 SEVERITY_RANK = {name: rank for rank, name in enumerate(("low", "medium", "high", "critical"))}
 CORE_AUDITORS = {"stack", "architecture", "bloat", "security", "testing"}
+PROJECT_MAP_KINDS = {"surface", "component", "data", "runtime", "external", "other"}
+PROJECT_MAP_STATUSES = {"current", "planned", "legacy"}
 
 
 class ContractError(ValueError):
@@ -270,9 +278,14 @@ def _validate_evidence(value: Any, label: str) -> dict[str, Any]:
 
 def validate_findings(value: Any, previous: Any | None = None, *, allow_provisional: bool = False) -> dict[str, Any]:
     document = _mapping(value, "findings document")
-    _exact_keys(document, {"schema_version", "auditor", "scanned_at", "scope", "findings"}, "findings document")
-    if type(document["schema_version"]) is not int or document["schema_version"] != 1:
-        raise ContractError("findings.schema_version must be 1")
+    _exact_keys(
+        document,
+        {"schema_version", "run_id", "auditor", "scanned_at", "scope", "findings"},
+        "findings document",
+    )
+    if type(document["schema_version"]) is not int or document["schema_version"] != 2:
+        raise ContractError("findings.schema_version must be 2")
+    _text(document["run_id"], "findings.run_id")
     _enum(document["auditor"], AUDITORS, "findings.auditor")
     _timestamp(document["scanned_at"], "findings.scanned_at")
     _validate_scope(document["scope"], "findings.scope")
@@ -372,8 +385,8 @@ def validate_findings(value: Any, previous: Any | None = None, *, allow_provisio
 def validate_inventory(value: Any, previous: Any | None = None) -> dict[str, Any]:
     inventory = _mapping(value, "inventory")
     _exact_keys(inventory, {"schema_version", "runs"}, "inventory")
-    if type(inventory["schema_version"]) is not int or inventory["schema_version"] != 1:
-        raise ContractError("inventory.schema_version must be 1")
+    if type(inventory["schema_version"]) is not int or inventory["schema_version"] != 2:
+        raise ContractError("inventory.schema_version must be 2")
     runs = _list(inventory["runs"], "inventory.runs")
     if not runs:
         raise ContractError("inventory.runs must not be empty")
@@ -383,7 +396,19 @@ def validate_inventory(value: Any, previous: Any | None = None) -> dict[str, Any
         run = _mapping(raw, label)
         _exact_keys(
             run,
-            {"id", "scanned_at", "source_state", "outcome", "domains", "coverage", "scope", "tools"},
+            {
+                "id",
+                "scanned_at",
+                "revision",
+                "worktree_clean",
+                "source_state",
+                "outcome",
+                "domains",
+                "coverage",
+                "scope",
+                "tools",
+                "verification",
+            },
             label,
         )
         run_id = _text(run["id"], f"{label}.id")
@@ -391,6 +416,13 @@ def validate_inventory(value: Any, previous: Any | None = None) -> dict[str, Any
             raise ContractError(f"duplicate audit run id: {run_id}")
         run_ids.add(run_id)
         _timestamp(run["scanned_at"], f"{label}.scanned_at")
+        revision = run["revision"]
+        if revision is not None and (
+            not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", revision)
+        ):
+            raise ContractError(f"{label}.revision must be a Git object id or null")
+        if run["worktree_clean"] is not None and type(run["worktree_clean"]) is not bool:
+            raise ContractError(f"{label}.worktree_clean must be a boolean or null")
         _enum(run["source_state"], {"greenfield", "codebase"}, f"{label}.source_state")
         outcome = _enum(run["outcome"], {"complete", "coverage-incomplete", "failed"}, f"{label}.outcome")
         domains = _mapping(run["domains"], f"{label}.domains")
@@ -420,9 +452,24 @@ def validate_inventory(value: Any, previous: Any | None = None) -> dict[str, Any
         _exact_keys(tools, {"jcodemunch"}, f"{label}.tools")
         for name, state in tools.items():
             _enum(state, {"used", "unavailable", "skipped", "failed"}, f"{label}.tools.{name}")
-        expected = "failed" if failed else (
+        verification = _mapping(run["verification"], f"{label}.verification")
+        _exact_keys(verification, {"blind", "issues"}, f"{label}.verification")
+        blind = _enum(verification["blind"], {"passed", "failed", "not-run"}, f"{label}.verification.blind")
+        issues = verification["issues"]
+        if type(issues) is not int or issues < 0:
+            raise ContractError(f"{label}.verification.issues must be a non-negative integer")
+        if blind == "failed" and issues == 0:
+            raise ContractError(f"{label}.verification.failed needs at least one issue")
+        if blind != "failed" and issues != 0:
+            raise ContractError(f"{label}.verification.issues must be zero unless blind verification failed")
+        expected = "failed" if failed or blind == "failed" else (
             "coverage-incomplete"
-            if scope["unscanned"] or "unknown" in domains.values() or set(completed) != set(required)
+            if (
+                blind != "passed"
+                or scope["unscanned"]
+                or "unknown" in domains.values()
+                or set(completed) != set(required)
+            )
             else "complete"
         )
         if outcome != expected:
@@ -433,6 +480,55 @@ def validate_inventory(value: Any, previous: Any | None = None) -> dict[str, Any
         if len(runs) < len(old_runs) or runs[: len(old_runs)] != old_runs:
             raise ContractError("inventory history is not append-only")
     return inventory
+
+
+def validate_project_map(value: Any) -> dict[str, Any]:
+    document = _mapping(value, "project map")
+    _exact_keys(document, {"schema_version", "run_id", "nodes", "edges"}, "project map")
+    if type(document["schema_version"]) is not int or document["schema_version"] != 1:
+        raise ContractError("project_map.schema_version must be 1")
+    _text(document["run_id"], "project_map.run_id")
+    nodes = _list(document["nodes"], "project_map.nodes")
+    node_ids: set[str] = set()
+    for index, raw in enumerate(nodes):
+        label = f"project_map.nodes[{index}]"
+        node = _mapping(raw, label)
+        _exact_keys(node, {"id", "label", "kind", "status", "evidence"}, label, {"group"})
+        node_id = _text(node["id"], f"{label}.id")
+        if not ID_RE.fullmatch(node_id) or node_id in node_ids:
+            raise ContractError(f"{label}.id must be a unique lowercase identifier")
+        node_ids.add(node_id)
+        _text(node["label"], f"{label}.label")
+        if "group" in node:
+            _text(node["group"], f"{label}.group")
+        _enum(node["kind"], PROJECT_MAP_KINDS, f"{label}.kind")
+        _enum(node["status"], PROJECT_MAP_STATUSES, f"{label}.status")
+        evidence = _list(node["evidence"], f"{label}.evidence")
+        if not evidence:
+            raise ContractError(f"{label}.evidence must not be empty")
+        for evidence_index, item in enumerate(evidence):
+            _validate_evidence(item, f"{label}.evidence[{evidence_index}]")
+    edges = _list(document["edges"], "project_map.edges")
+    seen_edges: set[tuple[str, str, str]] = set()
+    for index, raw in enumerate(edges):
+        label = f"project_map.edges[{index}]"
+        edge = _mapping(raw, label)
+        _exact_keys(edge, {"from", "to", "label", "evidence"}, label)
+        source = _text(edge["from"], f"{label}.from")
+        target = _text(edge["to"], f"{label}.to")
+        relation = _text(edge["label"], f"{label}.label")
+        if source not in node_ids or target not in node_ids:
+            raise ContractError(f"{label} references an unknown node")
+        identity = (source, target, relation)
+        if identity in seen_edges:
+            raise ContractError(f"{label} duplicates an existing edge")
+        seen_edges.add(identity)
+        evidence = _list(edge["evidence"], f"{label}.evidence")
+        if not evidence:
+            raise ContractError(f"{label}.evidence must not be empty")
+        for evidence_index, item in enumerate(evidence):
+            _validate_evidence(item, f"{label}.evidence[{evidence_index}]")
+    return document
 
 
 def _artifact_allowed(path: str, kind: str) -> bool:
@@ -541,7 +637,7 @@ def _decode_text(raw: bytes, label: str) -> str:
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
-            ["git", "-C", str(root), *args],
+            ["git", "-c", "core.fsmonitor=false", "-C", str(root), *args],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -572,9 +668,10 @@ def _verified_generated_paths(root: Path) -> set[str]:
     return {CONFIG_PATH, MANIFEST_PATH, *(artifact["path"] for artifact in manifest["artifacts"])}
 
 
-def _source_evidence(root: Path) -> list[str]:
+def _source_evidence(root: Path, generated_files: set[str] | None = None) -> list[str]:
     evidence: list[str] = []
-    generated_files = _verified_generated_paths(root)
+    if generated_files is None:
+        generated_files = _verified_generated_paths(root)
     ignored_trees = {".git"}
     ignored_prefixes = {
         ".agents/skills/project-context",
@@ -630,11 +727,80 @@ def _source_evidence(root: Path) -> list[str]:
     return sorted(evidence)
 
 
+def _source_worktree_clean(root: Path) -> bool | None:
+    try:
+        result = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
+    except ContractError:
+        return None
+    if result.returncode != 0:
+        return None
+    generated = _verified_generated_paths(root)
+    ignored_prefixes = (".agents/skills/project-context", ".claude/skills/project-context")
+    for line in result.stdout.splitlines():
+        path = line[3:] if len(line) >= 4 else line
+        paths = path.split(" -> ") if " -> " in path else [path]
+        for candidate in paths:
+            if any(candidate == prefix or candidate.startswith(prefix + "/") for prefix in ignored_prefixes):
+                continue
+            if candidate in generated:
+                host = next((name for name, filename in HOST_FILES.items() if filename == candidate), None)
+                if host is not None and _host_user_content_changed(root, candidate, host):
+                    return False
+                continue
+            return False
+    return True
+
+
+def _host_user_content_changed(root: Path, relative: str, host: str) -> bool:
+    path = root / relative
+    if not path.is_file():
+        return True
+    try:
+        current_raw = _read_regular(path, relative)
+        current = _decode_text(current_raw, relative)
+    except ContractError:
+        return True
+    base = _git(root, "show", f"HEAD:{relative}")
+    previous_has_bom = base.returncode == 0 and base.stdout.startswith("\ufeff")
+    if current_raw.startswith(b"\xef\xbb\xbf") != previous_has_bom:
+        return True
+    try:
+        previous = base.stdout.removeprefix("\ufeff") if base.returncode == 0 else ""
+        expected = merge_host_text(previous, host)
+    except ContractError:
+        return True
+    current = current.replace("\r\n", "\n").replace("\r", "\n")
+    expected = expected.replace("\r\n", "\n").replace("\r", "\n")
+    return current != expected
+
+
 def _resolve_existing(path: Path, label: str) -> Path:
     try:
         return path.resolve(strict=True)
     except OSError as exc:
         raise ContractError(f"{label} does not exist: {path}") from exc
+
+
+def _context_state(root: Path) -> tuple[str, str | None]:
+    repodocs = root / "repodocs"
+    has_repodocs = repodocs.is_dir() and any(repodocs.iterdir())
+    has_managed_host = False
+    for host, relative in HOST_FILES.items():
+        path = root / relative
+        if path.is_file():
+            text = _decode_text(_read_regular(path, relative), relative)
+            has_managed_host = has_managed_host or extract_host_block(text, host) is not None
+    has_surface = has_repodocs or has_managed_host or any(
+        os.path.lexists(root / relative)
+        for relative in (CONFIG_PATH, MANIFEST_PATH, "PROJECT_CONTEXT.md")
+    )
+    if not has_surface:
+        return "absent", None
+    try:
+        validate_project(root)
+    except ContractError as exc:
+        return "invalid", str(exc).replace(str(root), "<repo>")
+    return "valid", None
 
 
 def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
@@ -701,13 +867,18 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     revision = revision_result.stdout.strip() if revision_result.returncode == 0 else None
     if revision is not None and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", revision):
         raise ContractError("Git returned an invalid revision")
+    context_state, context_error = _context_state(root)
     evidence = _source_evidence(root)
+    worktree_clean = _source_worktree_clean(root)
     effective_skill = _resolve_existing(skill_root or Path(__file__).resolve().parents[1], "skill root")
     return {
         "status": "safe",
         "root": str(root),
         "git_root": str(git_root),
         "revision": revision,
+        "worktree_clean": worktree_clean,
+        "context_state": context_state,
+        "context_error": context_error,
         "source_state": "codebase" if evidence else "greenfield",
         "source_evidence": evidence,
         "canonical_config": CONFIG_PATH,
@@ -717,7 +888,69 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     }
 
 
-def validate_project(repo: Path) -> dict[str, Any]:
+class _VisibleHTMLText(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "template"}:
+            self.hidden += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "template"} and self.hidden:
+            self.hidden -= 1
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def _visible_governance_sources(text: str) -> list[str]:
+    text = re.sub(r"<!--.*?(?:-->|\Z)", "", text, flags=re.DOTALL)
+    values: list[str] = []
+    fence: tuple[str, int] | None = None
+    for line in text.splitlines():
+        if fence is not None:
+            if re.fullmatch(rf" {{0,3}}{re.escape(fence[0])}{{{fence[1]},}}[ \t]*", line):
+                fence = None
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if opening and (opening.group(1)[0] == "~" or "`" not in opening.group(2)):
+            fence = (opening.group(1)[0], len(opening.group(1)))
+            continue
+        if not line.startswith("- Sources:"):
+            continue
+        parser = _VisibleHTMLText()
+        parser.feed(line[len("- Sources:") :])
+        parser.close()
+        value = "".join(parser.parts)
+        visible: list[str] = []
+        index = 0
+        while index < len(value):
+            visible.append(value[index])
+            if value[index] == "]" and index + 1 < len(value) and value[index + 1] in "([":
+                opener = value[index + 1]
+                closer = ")" if opener == "(" else "]"
+                depth = 1
+                index += 2
+                while index < len(value) and depth:
+                    if value[index] == "\\" and index + 1 < len(value):
+                        index += 2
+                        continue
+                    if value[index] == opener:
+                        depth += 1
+                    elif value[index] == closer:
+                        depth -= 1
+                    index += 1
+                continue
+            index += 1
+        values.append("".join(visible))
+    return values
+
+
+def _validated_project(repo: Path) -> dict[str, Any]:
     root = _resolve_existing(repo, "repository path")
     config_path = safe_path(root, CONFIG_PATH, must_exist=True)
     manifest_path = safe_path(root, MANIFEST_PATH, must_exist=True)
@@ -783,10 +1016,17 @@ def validate_project(repo: Path) -> dict[str, Any]:
         )
     )
     latest_run = inventory["runs"][-1]
+    generated_paths = {CONFIG_PATH, MANIFEST_PATH, *(artifact["path"] for artifact in manifest["artifacts"])}
+    actual_source_state = "codebase" if _source_evidence(root, generated_paths) else "greenfield"
+    if latest_run["source_state"] != actual_source_state:
+        raise ContractError("latest inventory source_state does not match the repository")
+    if latest_run["verification"]["blind"] != "passed":
+        raise ContractError("latest audit run must pass independent blind verification")
     common_artifacts = {
         "decisions": "repodocs/decisions.md",
         "legacy_warning": "repodocs/LegacyWarning.md",
         "migration_backlog": "repodocs/migration-backlog.md",
+        "project_map": PROJECT_MAP_PATH,
         "drift_report": "repodocs/audit/drift-report.md",
     }
     topic_artifacts = {
@@ -841,6 +1081,40 @@ def validate_project(repo: Path) -> dict[str, Any]:
         for topic in topics:
             if f"[[context#{topic}]]" not in context:
                 raise ContractError(f"compact context is missing canonical topic link: {topic}")
+    project_map = validate_project_map(
+        strict_json_loads(_decode_text(artifact_bytes["project_map"], PROJECT_MAP_PATH), PROJECT_MAP_PATH)
+    )
+    if project_map["run_id"] != latest_run["id"]:
+        raise ContractError("project map run_id does not match latest audit run")
+    latest_scope = latest_run["scope"]
+
+    def path_is_in_scope(path: str, scope: dict[str, list[str]]) -> bool:
+        return (
+            _covered_by(path, scope["included"])
+            and not _covered_by(path, scope["excluded"])
+            and not _covered_by(path, scope["unscanned"])
+        )
+
+    for node in project_map["nodes"]:
+        for item in node["evidence"]:
+            if node["status"] == "planned":
+                if item["path"] != "repodocs/decisions.md":
+                    raise ContractError(f"planned project-map node needs ADR evidence: {node['id']}")
+            elif not path_is_in_scope(item["path"], latest_scope):
+                raise ContractError(f"project-map node evidence is outside latest completed scope: {node['id']}")
+    nodes_by_id = {node["id"]: node for node in project_map["nodes"]}
+    for edge in project_map["edges"]:
+        planned_edge = any(nodes_by_id[node_id]["status"] == "planned" for node_id in (edge["from"], edge["to"]))
+        for item in edge["evidence"]:
+            if planned_edge and item["path"] != "repodocs/decisions.md":
+                raise ContractError(
+                    f"planned project-map edge needs ADR evidence: {edge['from']} -> {edge['to']}"
+                )
+            if not planned_edge and not path_is_in_scope(item["path"], latest_scope):
+                raise ContractError(
+                    f"project-map edge evidence is outside latest completed scope: {edge['from']} -> {edge['to']}"
+                )
+    findings_by_auditor: dict[str, dict[str, Any]] = {}
     for auditor in latest_run["coverage"]["completed"]:
         artifact_id = f"finding_{auditor}"
         artifact_path = f"repodocs/audit/findings/{auditor}.json"
@@ -852,7 +1126,44 @@ def validate_project(repo: Path) -> dict[str, Any]:
         )
         if findings["auditor"] != auditor:
             raise ContractError(f"findings auditor does not match artifact: {auditor}")
+        if findings["run_id"] != latest_run["id"]:
+            raise ContractError(f"findings run_id does not match latest audit run: {auditor}")
+        for finding in findings["findings"]:
+            if finding["status"] not in {"new", "persisting"}:
+                continue
+            paths = [finding["identity"]["path"]]
+            paths.extend(item["path"] for item in finding["evidence"])
+            paths.extend(item["path"] for item in finding["verification"]["counterevidence"])
+            if any(
+                not path_is_in_scope(path, latest_scope) or not path_is_in_scope(path, findings["scope"])
+                for path in paths
+            ):
+                raise ContractError(f"active finding is outside completed audit scope: {finding['id']}")
+        findings_by_auditor[auditor] = findings
+    governance_paths = {
+        "repodocs/decisions.md",
+        "repodocs/LegacyWarning.md",
+        "repodocs/migration-backlog.md",
+        "repodocs/audit/drift-report.md",
+    }
+    governance_sources = [
+        source
+        for path in governance_paths
+        for source in _visible_governance_sources(markdown[path])
+    ]
+    for document in findings_by_auditor.values():
+        for finding in document["findings"]:
+            if finding["status"] in {"new", "persisting"} and not any(
+                re.search(
+                    rf"(?<![A-Za-z0-9-]){re.escape(finding['id'])}(?![A-Za-z0-9-])",
+                    line,
+                )
+                for line in governance_sources
+            ):
+                raise ContractError(f"active finding lacks a disposition reference: {finding['id']}")
     wikilinks = 0
+    wikilink_entries: list[dict[str, str]] = []
+    artifact_ids_by_path = {artifact["path"]: artifact_id for artifact_id, artifact in artifacts_by_id.items()}
     for relative, text in markdown.items():
         tokens = WIKILINK_TOKEN_RE.findall(text)
         if text.count("[[") != len(tokens) or text.count("]]") != len(tokens):
@@ -861,6 +1172,10 @@ def validate_project(repo: Path) -> dict[str, Any]:
         if len(links) != len(tokens):
             raise ContractError(f"{relative} has malformed wikilinks")
         wikilinks += len(links)
+        source_id = artifact_ids_by_path[relative]
+        wikilink_entries.extend(
+            {"source": source_id, "target": target, "fragment": fragment} for target, fragment in links
+        )
         unknown_links = sorted({target for target, _ in links} - artifacts_by_id.keys())
         if unknown_links:
             raise ContractError(f"{relative} has unknown wikilinks: {', '.join(unknown_links)}")
@@ -870,13 +1185,367 @@ def validate_project(repo: Path) -> dict[str, Any]:
                 target_text = markdown.get(target_path, "")
                 if f'<a id="{fragment}"></a>' not in target_text:
                     raise ContractError(f"{relative} has unresolved wikilink anchor: {target}#{fragment}")
-    return {
+    summary = {
         "status": "valid",
         "artifacts": len(manifest["artifacts"]),
         "hosts": manifest["hosts"],
         "domains": manifest["domains"],
         "wikilinks": wikilinks,
     }
+    return {
+        "root": root,
+        "config": config,
+        "manifest": manifest,
+        "inventory": inventory,
+        "latest_run": latest_run,
+        "artifacts": artifacts_by_id,
+        "markdown": markdown,
+        "findings": findings_by_auditor,
+        "project_map": project_map,
+        "wikilinks": wikilink_entries,
+        "summary": summary,
+    }
+
+
+def validate_project(repo: Path) -> dict[str, Any]:
+    return cast(dict[str, Any], _validated_project(repo)["summary"])
+
+
+def _markdown_sections(text: str, prefix: str | None = None) -> list[dict[str, str]]:
+    """Extract stable headings as plain text; this is not a Markdown renderer."""
+    sections: list[dict[str, str]] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"##\s+(.+)", line.strip())
+        if not match:
+            continue
+        title = match.group(1).strip()
+        identifier = title.split(":", 1)[0].strip()
+        if prefix and not re.fullmatch(rf"{re.escape(prefix)}-[0-9]{{3,}}", identifier):
+            continue
+        body: list[str] = []
+        for candidate in lines[index + 1 :]:
+            if candidate.startswith("## "):
+                break
+            if candidate.strip() and not candidate.lstrip().startswith("<!--"):
+                body.append(candidate.strip())
+            if len(body) == 8:
+                break
+        sections.append({"id": identifier, "title": title, "summary": "\n".join(body)})
+    return sections
+
+
+def _dashboard_revision_state(current: dict[str, Any], audited: dict[str, Any]) -> str:
+    if (
+        audited["worktree_clean"] is not True
+        or not audited["revision"]
+        or current["worktree_clean"] is None
+        or not current["revision"]
+    ):
+        return "unknown"
+    if current["worktree_clean"] is True and current["revision"] == audited["revision"]:
+        return "current"
+    return "stale"
+
+
+def _snapshot_id(value: dict[str, Any]) -> str:
+    content = {key: item for key, item in value.items() if key not in {"generated_at", "snapshot_id"}}
+    canonical = json.dumps(content, allow_nan=False, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def dashboard_snapshot(repo: Path) -> dict[str, Any]:
+    """Build a read-only dashboard model from the same validated project contract."""
+    current = preflight(repo)
+    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    root = Path(current["root"])
+    version = (Path(__file__).resolve().parents[1] / "VERSION").read_text(encoding="utf-8").strip()
+    model: dict[str, Any] = {
+        "schema_version": 1,
+        "generated_at": generated_at,
+        "project": {
+            "name": root.name,
+            "revision": current["revision"],
+            "short_revision": current["revision"][:8] if current["revision"] else None,
+            "worktree_clean": current["worktree_clean"],
+            "revision_state": "unknown",
+        },
+        "context": {
+            "state": current["context_state"],
+            "error": current["context_error"],
+            "skill_version": version,
+            "language": "en",
+            "layout": None,
+            "hosts": [],
+            "domains": [],
+        },
+        "audit": {"latest": None, "history": []},
+        "findings": [],
+        "finding_summary": {"total": 0, "active": 0, "critical_high": 0},
+        "project_map": {"nodes": [], "edges": []},
+        "context_map": {"nodes": [], "edges": []},
+        "documents": {"decisions": [], "debt": [], "backlog": [], "drift": []},
+        "integrity": {
+            "status": current["context_state"],
+            "artifacts": 0,
+            "wikilinks": 0,
+            "checks": [],
+            "limitations": ["Structural validation does not prove factual completeness."],
+        },
+    }
+    if current["context_state"] != "valid":
+        model["snapshot_id"] = _snapshot_id(model)
+        return model
+
+    try:
+        project = _validated_project(root)
+    except ContractError as exc:
+        model["context"]["state"] = "invalid"
+        model["context"]["error"] = str(exc).replace(str(root), "<repo>")
+        model["integrity"]["status"] = "invalid"
+        model["snapshot_id"] = _snapshot_id(model)
+        return model
+
+    config = project["config"]
+    manifest = project["manifest"]
+    latest = project["latest_run"]
+    flattened: list[dict[str, Any]] = []
+    for auditor, document in project["findings"].items():
+        for finding in document["findings"]:
+            verification = finding["verification"]
+            flattened.append(
+                {
+                    **finding,
+                    "auditor": auditor,
+                    "source_severity": finding["severity"],
+                    "effective_severity": verification.get("resulting_severity") or finding["severity"],
+                }
+            )
+    flattened.sort(
+        key=lambda item: (
+            item["status"] not in {"new", "persisting"},
+            -SEVERITY_RANK[item["effective_severity"]],
+            item["auditor"],
+            item["id"],
+        )
+    )
+    active = [item for item in flattened if item["status"] in {"new", "persisting"}]
+    revision_state = _dashboard_revision_state(current, latest)
+    model["project"]["revision_state"] = revision_state
+    model["context"].update(
+        {
+            "language": config["language"],
+            "layout": config["document_layout"],
+            "hosts": manifest["hosts"],
+            "domains": manifest["domains"],
+        }
+    )
+    model["audit"] = {"latest": latest, "history": list(reversed(project["inventory"]["runs"]))}
+    model["findings"] = flattened
+    model["finding_summary"] = {
+        "total": len(flattened),
+        "active": len(active),
+        "critical_high": sum(item["effective_severity"] in {"critical", "high"} for item in active),
+    }
+    model["project_map"] = {
+        "nodes": project["project_map"]["nodes"],
+        "edges": project["project_map"]["edges"],
+    }
+    artifact_paths = {artifact_id: artifact["path"] for artifact_id, artifact in project["artifacts"].items()}
+    model["context_map"] = {
+        "nodes": [
+            {
+                "id": artifact_id,
+                "label": artifact["path"],
+                "group": "Context artifacts",
+                "kind": artifact["kind"].replace("_", " "),
+                "status": "current",
+                "evidence": [{"path": artifact["path"], "detail": "Manifest-owned validated artifact."}],
+            }
+            for artifact_id, artifact in sorted(project["artifacts"].items())
+        ],
+        "edges": [
+            {
+                "from": link["source"],
+                "to": link["target"],
+                "label": f"links to #{link['fragment']}" if link["fragment"] else "links to",
+                "evidence": [
+                    {"path": artifact_paths[link["source"]], "detail": "Validated wikilink reference."}
+                ],
+            }
+            for link in project["wikilinks"]
+        ],
+    }
+    markdown = project["markdown"]
+    model["documents"] = {
+        "decisions": _markdown_sections(markdown["repodocs/decisions.md"], "ADR"),
+        "debt": _markdown_sections(markdown["repodocs/LegacyWarning.md"]),
+        "backlog": _markdown_sections(markdown["repodocs/migration-backlog.md"], "MB"),
+        "drift": _markdown_sections(markdown["repodocs/audit/drift-report.md"]),
+    }
+    limitations = ["Structural validation does not prove factual completeness."]
+    if revision_state == "unknown":
+        limitations.append("Source freshness is unknown because the audit or current worktree is not cleanly anchored.")
+    elif revision_state == "stale":
+        limitations.append("Repository HEAD or worktree changed after the latest audit.")
+    model["integrity"] = {
+        "status": "valid",
+        "artifacts": project["summary"]["artifacts"],
+        "wikilinks": project["summary"]["wikilinks"],
+        "checks": [
+            {"name": "Manifest and hashes", "status": "passed"},
+            {"name": "Audit run binding", "status": "passed"},
+            {"name": "Independent completeness check", "status": latest["verification"]["blind"]},
+            {"name": "HEAD matches audit", "status": revision_state},
+        ],
+        "limitations": limitations,
+    }
+    model["snapshot_id"] = _snapshot_id(model)
+    return model
+
+
+def _dashboard_json(value: dict[str, Any]) -> str:
+    encoded = json.dumps(value, allow_nan=False, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return (
+        encoded.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
+def render_dashboard_html(repo: Path, route: str = "/", nonce: str | None = None) -> bytes:
+    if not re.fullmatch(r"/(?:[a-zA-Z0-9_-]+/)?", route):
+        raise ContractError("dashboard route is invalid")
+    nonce = nonce or secrets.token_urlsafe(18)
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", nonce):
+        raise ContractError("dashboard CSP nonce is invalid")
+    template_path = Path(__file__).resolve().parents[1] / "assets/dashboard.html"
+    template = _decode_text(_read_regular(template_path, "assets/dashboard.html"), "assets/dashboard.html")
+    replacements = {
+        "__CSP_NONCE__": nonce,
+        "__DASHBOARD_ROUTE__": route,
+        # Insert repository-derived data last so marker-like text inside it stays inert.
+        "__SNAPSHOT__": _dashboard_json(dashboard_snapshot(repo)),
+    }
+    for marker, replacement in replacements.items():
+        if marker not in template:
+            raise ContractError(f"dashboard template is missing {marker}")
+        template = template.replace(marker, replacement)
+    return template.encode("utf-8")
+
+
+def serve_dashboard(repo: Path, *, open_browser: bool = True) -> None:
+    root = _resolve_existing(repo, "repository path")
+    # Validate the fixed root before opening a socket; requests can never choose another path.
+    preflight(root)
+    token = secrets.token_hex(16)
+    route = f"/{token}/"
+
+    class DashboardHandler(BaseHTTPRequestHandler):
+        server_version = "ProjectContext/1"
+        sys_version = ""
+
+        def log_message(self, format: str, *args: Any) -> None:
+            return
+
+        def _headers(self, status: int, length: int, nonce: str, content_type: str) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(length))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header(
+                "Content-Security-Policy",
+                "; ".join(
+                    (
+                        "default-src 'none'",
+                        f"script-src 'nonce-{nonce}'",
+                        f"style-src 'nonce-{nonce}'",
+                        "img-src data:",
+                        "connect-src 'none'",
+                        "form-action 'self'",
+                        "base-uri 'none'",
+                        "frame-ancestors 'none'",
+                    )
+                ),
+            )
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+            self.end_headers()
+
+        def _page(self, *, head: bool = False) -> None:
+            dashboard_server = cast(ThreadingHTTPServer, self.server)
+            expected_host = f"127.0.0.1:{dashboard_server.server_port}"
+            if self.headers.get("Host") not in {expected_host, f"localhost:{dashboard_server.server_port}"}:
+                self._plain(400, b"invalid host\n", head=head)
+                return
+            try:
+                parsed = urlsplit(self.path)
+            except ValueError:
+                self._plain(400, b"invalid request target\n", head=head)
+                return
+            if (
+                not self.path.startswith("/")
+                or self.path.startswith("//")
+                or parsed.scheme
+                or parsed.netloc
+                or parsed.path != route
+                or parsed.query
+                or parsed.fragment
+            ):
+                self._plain(404, b"not found\n", head=head)
+                return
+            nonce = secrets.token_urlsafe(18)
+            try:
+                body = render_dashboard_html(root, route, nonce)
+            except ContractError:
+                self._plain(500, b"dashboard validation failed\n", head=head)
+                return
+            self._headers(200, len(body), nonce, "text/html; charset=utf-8")
+            if not head:
+                self.wfile.write(body)
+
+        def _plain(self, status: int, body: bytes, *, head: bool = False) -> None:
+            nonce = secrets.token_urlsafe(18)
+            self._headers(status, len(body), nonce, "text/plain; charset=utf-8")
+            if not head:
+                self.wfile.write(body)
+
+        def _method_not_allowed(self) -> None:
+            body = b"method not allowed\n"
+            self.send_response(405)
+            self.send_header("Allow", "GET, HEAD")
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = _page
+
+        def do_HEAD(self) -> None:
+            self._page(head=True)
+
+        do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = do_TRACE = do_CONNECT = _method_not_allowed
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), DashboardHandler)
+    server.daemon_threads = True
+    url = f"http://127.0.0.1:{server.server_port}{route}"
+    print(f"Project Context dashboard: {url}", flush=True)
+    if open_browser:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
 
 
 def self_check(skill_root: Path) -> dict[str, Any]:
@@ -887,14 +1556,20 @@ def self_check(skill_root: Path) -> dict[str, Any]:
         "LICENSE",
         "VERSION",
         "agents/openai.yaml",
+        "assets/dashboard.html",
+        "assets/project-context-icon.svg",
+        "assets/project-context-logo.svg",
         "scripts/project_context.py",
         "evals/cases.json",
         "schemas/findings.schema.json",
+        "schemas/project-map.schema.json",
         "examples/PROJECT_CONTEXT.md",
         "examples/inventory.json",
+        "examples/project-map.json",
         "templates/PROJECT_CONTEXT.md",
         "templates/project-context.config.json",
         "templates/project-context.manifest.json",
+        "templates/project-map.json",
         "templates/host/AGENTS.block.md",
         "templates/host/CLAUDE.block.md",
         "templates/host/claude-skill-adapter.md",
@@ -914,7 +1589,10 @@ def self_check(skill_root: Path) -> dict[str, Any]:
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
         raise ContractError("VERSION must contain x.y.z")
     load_json(root / "schemas/findings.schema.json")
+    load_json(root / "schemas/project-map.schema.json")
     validate_config(load_json(root / "templates/project-context.config.json"))
+    validate_project_map(load_json(root / "templates/project-map.json"))
+    validate_project_map(load_json(root / "examples/project-map.json"))
     manifest = validate_manifest(load_json(root / "templates/project-context.manifest.json"))
     if manifest["skill_version"] != version:
         raise ContractError("template manifest skill_version does not match VERSION")
@@ -966,8 +1644,13 @@ def build_parser() -> argparse.ArgumentParser:
     command = commands.add_parser("validate-inventory")
     command.add_argument("--input", required=True, type=Path)
     command.add_argument("--previous", type=Path)
+    command = commands.add_parser("validate-project-map")
+    command.add_argument("--input", required=True, type=Path)
     command = commands.add_parser("validate-manifest")
     command.add_argument("--input", required=True, type=Path)
+    command = commands.add_parser("dashboard")
+    command.add_argument("--repo", required=True, type=Path)
+    command.add_argument("--no-open", action="store_true")
     return parser
 
 
@@ -1008,9 +1691,14 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "validate-inventory":
             inventory = validate_inventory(load_json(args.input), load_json(args.previous) if args.previous else None)
             dump({"status": "valid", "runs": len(inventory["runs"])})
+        elif args.command == "validate-project-map":
+            project_map = validate_project_map(load_json(args.input))
+            dump({"status": "valid", "nodes": len(project_map["nodes"]), "edges": len(project_map["edges"])})
         elif args.command == "validate-manifest":
             manifest = validate_manifest(load_json(args.input))
             dump({"status": "valid", "artifacts": len(manifest["artifacts"])})
+        elif args.command == "dashboard":
+            serve_dashboard(args.repo, open_browser=not args.no_open)
         return 0
     except ContractError as exc:
         print(json.dumps({"error": str(exc), "code": exc.code}, ensure_ascii=False), file=sys.stderr)

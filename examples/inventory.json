@@ -1,9 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "runs": [
     {
       "id": "audit-20260802T120000Z-example",
       "scanned_at": "2026-08-02T12:00:00Z",
+      "revision": null,
+      "worktree_clean": null,
       "source_state": "codebase",
       "outcome": "complete",
       "domains": {"ui": "absent", "data": "absent"},
@@ -21,7 +23,8 @@
         "excluded": ["repodocs"],
         "unscanned": []
       },
-      "tools": {"jcodemunch": "used"}
+      "tools": {"jcodemunch": "used"},
+      "verification": {"blind": "passed", "issues": 0}
     }
   ]
 }
