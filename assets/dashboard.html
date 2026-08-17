@@ -1025,7 +1025,7 @@
     </dl>
 
     <form class="refresh-form" method="get" action="__DASHBOARD_ROUTE__">
-      <button class="refresh-button" id="refresh-button" type="submit" aria-describedby="refresh-help">
+      <button class="refresh-button" id="refresh-button" type="submit" aria-describedby="refresh-help" title="Re-read validated artifacts; does not run an audit">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 6.8A7 7 0 1 0 17 12M16.4 6.8V2.9m0 3.9h-3.9"/></svg>
         <span id="refresh-label">Refresh</span>
       </button>
@@ -1128,8 +1128,8 @@
           <p>Evidence-backed project topology and the validated document graph.</p>
         </div>
         <div class="tab-list" role="tablist" aria-label="Map type">
-          <button id="project-map-tab" type="button" role="tab" aria-selected="true" aria-controls="project-map-panel" tabindex="0">Project</button>
-          <button id="context-map-tab" type="button" role="tab" aria-selected="false" aria-controls="context-map-panel" tabindex="-1">Context</button>
+          <button id="project-map-tab" type="button" role="tab" aria-selected="true" aria-controls="project-map-panel" tabindex="0" title="Show authored project topology">Project</button>
+          <button id="context-map-tab" type="button" role="tab" aria-selected="false" aria-controls="context-map-panel" tabindex="-1" title="Browse validated context relationships">Context</button>
         </div>
       </header>
       <div class="map-panel">
@@ -1186,7 +1186,7 @@
             <option value="refuted">Refuted</option>
           </select>
         </div>
-        <button class="reset-button" id="reset-filters" type="button">Reset</button>
+        <button class="reset-button" id="reset-filters" type="button" title="Clear all finding filters">Reset</button>
       </div>
 
       <p class="filter-result"><output id="finding-count" aria-live="polite">0 findings</output></p>
@@ -1195,7 +1195,7 @@
           <span class="finding-selection-count" id="finding-selection-count">0 selected</span>
           <span id="finding-selection-help">Select active findings. Select-all affects shown active findings; hidden selections stay selected.</span>
         </div>
-        <button class="clear-selection-button" id="clear-finding-selection" type="button" hidden>Clear selection</button>
+        <button class="clear-selection-button" id="clear-finding-selection" type="button" title="Clear selected findings" hidden>Clear selection</button>
         <button class="master-prompt-button" id="copy-master-prompt" type="button" aria-disabled="true" aria-describedby="master-prompt-scope" disabled>Copy master prompt</button>
       </div>
       <details class="prompt-preview master-prompt-preview" id="master-prompt-preview" hidden>
@@ -1812,10 +1812,14 @@
       }
 
       function renderHeader() {
-        byId("repository-name").textContent = asText(project.name, "Repository");
+        const repositoryName = byId("repository-name");
+        repositoryName.textContent = asText(project.name, "Repository");
+        repositoryName.title = repositoryName.textContent;
         const revision = asText(project.short_revision) || (asText(project.revision) ? project.revision.slice(0, 10) : "");
         const branch = asText(project.branch);
-        byId("repository-revision").textContent = [branch, revision].filter(Boolean).join(" · ") || "Revision unavailable";
+        const repositoryRevision = byId("repository-revision");
+        repositoryRevision.textContent = [branch, revision].filter(Boolean).join(" · ") || "Revision unavailable";
+        repositoryRevision.title = asText(project.revision, repositoryRevision.textContent);
         setBadge(byId("revision-state-badge"), normalized(project.revision_state), titleCase(project.revision_state));
         setTime("refreshed-at", snapshot.generated_at);
         setTime("latest-audit-at", latestAudit.scanned_at);
@@ -1966,6 +1970,7 @@
         intelligence.append(make("h4", "", "Context intelligence (focused)"), contextMetricGrid());
         const contextAction = make("button", "prompt-copy-button", "Open focused context");
         contextAction.type = "button";
+        contextAction.title = "Open this finding's evidence artifact in Context Explorer";
         contextAction.addEventListener("click", () => {
           const path = findingArtifactPath(finding);
           navigateWorkspace("#context-map", () => {
@@ -2268,6 +2273,7 @@
             const id = asText(node.id);
             const button = make("button", "context-document-button");
             button.type = "button";
+            button.title = nodePath(node);
             button.setAttribute("aria-pressed", "false");
             button.setAttribute("aria-controls", "context-artifact-detail");
             const outgoing = asArray(graph.outgoing.get(id)).length;
@@ -2485,10 +2491,19 @@
           const button = make("button", "", label);
           button.type = "button";
           button.setAttribute("aria-label", ariaLabel);
+          button.title = ariaLabel;
           return button;
         };
-        const routeButton = graphButton("Trace route", "Select a route start and destination");
-        routeButton.setAttribute("aria-pressed", "false");
+        const routeButton = graphButton("Find path", "Find path: choose a start node, then a destination; highlights the shortest authored directed path");
+        const setPathButtonState = (active) => {
+          const label = active ? "Cancel path" : "Find path";
+          const hint = active ? "Cancel path selection" : "Find path: choose a start node, then a destination; highlights the shortest authored directed path";
+          routeButton.textContent = label;
+          routeButton.setAttribute("aria-label", hint);
+          routeButton.setAttribute("aria-pressed", String(active));
+          routeButton.title = hint;
+        };
+        setPathButtonState(false);
         const zoomOutButton = graphButton("Zoom −", "Zoom out");
         const zoomInButton = graphButton("Zoom +", "Zoom in");
         const fitButton = graphButton("Fit", "Fit all project map nodes");
@@ -2529,7 +2544,7 @@
         layout.append(viewport, inspector);
         shell.append(layout);
 
-        const instructions = make("p", "graph-instructions", "Select a node for authored upstream and downstream reach. Trace route, then choose start and destination. Drag empty space to pan; use the controls or +, − and 0 while the map is focused.");
+        const instructions = make("p", "graph-instructions", "Select a node for authored upstream and downstream reach. Find path: choose a start node, then a destination. Drag empty space to pan; use the controls or +, − and 0 while the map is focused.");
         instructions.id = "project-graph-instructions";
         const receipt = make("p", "graph-receipt");
         receipt.id = "project-graph-receipt";
@@ -2547,7 +2562,9 @@
 
         lanes.forEach((lane) => {
           laneLayer.append(svgMake("rect", {class: "graph-lane", x: lane.x, y: OUTER_PADDING, width: lane.width, height: graphHeight - OUTER_PADDING * 2, rx: "12"}));
-          laneLayer.append(svgMake("text", {class: "graph-lane-label", x: lane.x + LANE_PADDING, y: OUTER_PADDING + 23}, truncate(lane.group, 34)));
+          const laneLabel = svgMake("text", {class: "graph-lane-label", x: lane.x + LANE_PADDING, y: OUTER_PADDING + 23}, truncate(lane.group, 34));
+          if (lane.group.length > 34) laneLabel.append(svgMake("title", {}, lane.group));
+          laneLayer.append(laneLabel);
           laneLayer.append(svgMake("text", {class: "graph-lane-count", x: lane.x + LANE_PADDING, y: OUTER_PADDING + 41}, `${lane.nodes.length} node${lane.nodes.length === 1 ? "" : "s"}`));
         });
 
@@ -2756,22 +2773,21 @@
             routeResult = null;
             selectedId = id;
             updateGraphState();
-            announce(`Route start ${nodeReference(nodeById.get(id))} selected. Choose a destination`);
+            announce(`Path start ${nodeReference(nodeById.get(id))} selected. Choose a destination`);
             return;
           }
           routeDestination = id;
           routeResult = shortestDirectedPath(routeStart, routeDestination);
           selectedId = id;
           routePicking = false;
-          routeButton.setAttribute("aria-pressed", "false");
-          routeButton.textContent = "Trace route";
+          setPathButtonState(false);
           updateGraphState();
           if (!routeResult) {
-            announce(`No directed route is authored from ${nodeReference(nodeById.get(routeStart))} to ${nodeReference(nodeById.get(routeDestination))}`);
+            announce(`No directed path is authored from ${nodeReference(nodeById.get(routeStart))} to ${nodeReference(nodeById.get(routeDestination))}`);
             return;
           }
           const labels = routeResult.nodes.map((nodeId) => nodeReference(nodeById.get(nodeId)));
-          announce(`Shortest authored directed route: ${labels.join(" → ")} (${routeResult.edges.length} edge${routeResult.edges.length === 1 ? "" : "s"})`);
+          announce(`Shortest authored directed path: ${labels.join(" → ")} (${routeResult.edges.length} edge${routeResult.edges.length === 1 ? "" : "s"})`);
         }
 
         function activateNode(id) {
@@ -2845,8 +2861,7 @@
           routeStart = null;
           routeDestination = null;
           routeResult = null;
-          routeButton.setAttribute("aria-pressed", "false");
-          routeButton.textContent = "Trace route";
+          setPathButtonState(false);
           svg.classList.remove("is-fit");
           fitView(false);
           updateGraphState();
@@ -2857,10 +2872,9 @@
           routeStart = null;
           routeDestination = null;
           routeResult = null;
-          routeButton.setAttribute("aria-pressed", String(routePicking));
-          routeButton.textContent = routePicking ? "Cancel route" : "Trace route";
+          setPathButtonState(routePicking);
           updateGraphState();
-          announce(routePicking ? "Route tracing started. Choose a start node" : "Route tracing canceled");
+          announce(routePicking ? "Path selection started. Choose a start node" : "Path selection canceled");
         });
 
         let drag = null;

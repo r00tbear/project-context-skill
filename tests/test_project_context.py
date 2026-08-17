@@ -1216,7 +1216,10 @@ class DashboardTests(unittest.TestCase):
             "authored reach": "function authoredReach(start, adjacency)",
             "shortest route": "function shortestDirectedPath(start, destination)",
             "directed traversal": "for (const step of forward.get(current) || [])",
-            "route control": 'graphButton("Trace route"',
+            "path control": 'graphButton("Find path"',
+            "path helper": "Find path: choose a start node, then a destination.",
+            "native tooltips": "button.title = ariaLabel",
+            "truncated lane tooltip": "if (lane.group.length > 34) laneLabel.append(svgMake(\"title\", {}, lane.group))",
             "zoom out": 'graphButton("Zoom −", "Zoom out")',
             "zoom in": 'graphButton("Zoom +", "Zoom in")',
             "fit": 'graphButton("Fit", "Fit all project map nodes")',
@@ -1248,6 +1251,7 @@ class DashboardTests(unittest.TestCase):
         ):
             with self.subTest(forbidden_sink=sink):
                 self.assertNotRegex(source, sink)
+        self.assertNotIn("Trace route", source)
 
     def test_dashboard_workspace_navigation_and_typed_attention_drilldown_contract(self) -> None:
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
@@ -1257,6 +1261,13 @@ class DashboardTests(unittest.TestCase):
             '<a data-mode="remediate" href="#findings">Remediate',
             '<a data-mode="explore" href="#project-map">Explore</a>',
             '<a data-mode="govern" href="#decisions">Govern</a>',
+            'title="Re-read validated artifacts; does not run an audit"',
+            'title="Show authored project topology"',
+            'title="Browse validated context relationships"',
+            'title="Clear all finding filters"',
+            'repositoryName.title = repositoryName.textContent',
+            'repositoryRevision.title = asText(project.revision, repositoryRevision.textContent)',
+            'contextAction.title = "Open this finding\'s evidence artifact in Context Explorer"',
             '<li><a href="#project-map">Project topology</a></li>',
             '<li><a href="#context-map">Context documents</a></li>',
             'id="attention-inspector" aria-labelledby="attention-inspector-title"',
@@ -1288,6 +1299,7 @@ class DashboardTests(unittest.TestCase):
             'const selected = buttons.find((entry) => asText(entry.node.id) === selectedNodeId)',
             'selectNode(asText(visible[0].node.id), false)',
             'emptyState("No matching context artifact"',
+            'button.title = nodePath(node)',
         ):
             with self.subTest(token=token):
                 self.assertIn(token, source)
