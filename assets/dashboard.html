@@ -1411,7 +1411,7 @@
       const integrity = asObject(snapshot.integrity);
       const documents = asObject(snapshot.documents);
       const findings = asArray(snapshot.findings).map((raw) => asObject(raw));
-      let focusContextArtifact = () => false;
+      let focusContextArtifact = (_path) => false;
       let activateMapTab = () => {};
       let navigateWorkspace = (hash, after) => {
         window.location.hash = hash;
