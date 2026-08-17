@@ -115,7 +115,9 @@ Read `references/diff-review.md`. Review is a workflow, not a bundled model runn
 3. Keep Project Context branding and show `Data refreshed` from the current dashboard snapshot separately from `Latest audit` in the latest inventory run.
 4. The Refresh button re-reads and re-validates canonical artifacts. If validation fails, show the invalid state and its sanitized reason; never mask it with cached data.
 5. Render the validated Project Map as browser-native SVG with focus/evidence inspection, upstream/downstream reach over authored edges, exact directed-route search, zoom/fit, and an accessible list fallback. These interactions never infer impact, missing links, or new topology.
-6. Show invalid, partial, stale, and unknown states explicitly. Never invent health scores, percentages, ETA, architecture edges, or freshness. Dashboard refresh time is not audit freshness.
+6. Keep the raw validated Context occurrences as truth, but make the default view a focused artifact explorer that aggregates exact directed source-target pairs and retains every fragment and evidence location on demand. Never infer relationships.
+7. Build each Findings AI prompt only from the validated snapshot's binding, lifecycle metadata, and evidence locations. Let users select active rows across filters and copy one capped, all-or-nothing Master Prompt bound to the exact dynamic active set and selected identity hashes; Select all affects only shown active rows. Omit finding prose, mark local content untrusted, stop stale/unknown prompts before queues or writes, serialize overlapping edits through one coordinator, and require comparable re-audit, previous-state validation, blind verification, approved aggregate preview, and manifest-last validation before closure. Copy and preview remain local read-only interactions.
+8. Show invalid, partial, stale, and unknown states explicitly. Never invent health scores, percentages, ETA, architecture edges, or freshness. Dashboard refresh time is not audit freshness.
 
 ## Resources
 

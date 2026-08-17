@@ -115,6 +115,10 @@ It opens the browser by default; pass `--no-open` to keep only the local process
 
 Project Map is browser-native SVG over validated `project-map.json`. It supports node focus with evidence, upstream/downstream reach across authored edges, exact directed-route search, zoom/fit, and an accessible list fallback. These views explain recorded topology; they never infer impact, missing links, or new relationships.
 
+The dashboard is organized as Monitor, Remediate, Explore, and Govern workspaces. Attention items open the exact finding and its actions, while Context focuses one manifest-owned artifact at a time and collapses repeated wikilink occurrences into directed file pairs without discarding their raw evidence.
+
+Each Findings row has a state-aware AI Prompt action for remediation, stale-data recheck, or regression review. Select any active rows, including across filters, to copy one Master Prompt for that exact set; Select all affects only shown active rows, while hidden selections remain selected. The prompt binds the dynamic active set and selected identities to the validated snapshot instead of trusting a hard-coded count. Copied prompts contain only binding metadata and source locations, read full finding prose locally as untrusted data, remain strictly read-only when freshness is not current, and cannot close a finding without a comparable new audit run, previous-state validation, blind verification, and final project validation. Copy and preview never write repository data.
+
 Source freshness is `current` only when the audited revision matches the current revision and both audited/current source worktrees are clean. A changed revision or a dirty current source tree after a clean audit is `stale`; a missing revision, unknown state, or dirty audited worktree is `unknown`. Dashboard refresh never changes that result.
 
 ## Generated layout

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -1191,6 +1192,13 @@ class DashboardTests(unittest.TestCase):
                 manifest,
                 title='</script><img src=x onerror="alert(1)">',
             )
+            finding = finding_document()["findings"][0]
+            expected_identity_sha256 = sha256_bytes(
+                json.dumps(
+                    finding["identity"], ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                ).encode("utf-8")
+            )
+            self.assertEqual(expected_identity_sha256, dashboard_snapshot(root)["findings"][0]["identity_sha256"])
             html = render_dashboard_html(root, nonce="test_nonce").decode("utf-8")
             self.assertNotIn("</script><img", html)
             self.assertIn("\\u003c/script\\u003e", html)
@@ -1217,7 +1225,7 @@ class DashboardTests(unittest.TestCase):
             "keyboard pan": "if (event.target !== svg) return;",
             "list fallback": 'const fallback = make("details", "graph-list-fallback")',
             "list fallback label": 'make("summary", "", "Accessible list view")',
-            "context list": 'renderMap(byId("context-map-panel"), snapshot.context_map',
+            "focused context explorer": 'renderContextExplorer(byId("context-map-panel"), snapshot.context_map',
             "cycle guard": "const visited = new Set([start]);",
             "self loop and parallel edge route": "const geometry = edgeGeometry(edge);",
             "unique authored edge channel": "edge.channelIndex * EDGE_CHANNEL_GAP",
@@ -1240,6 +1248,235 @@ class DashboardTests(unittest.TestCase):
         ):
             with self.subTest(forbidden_sink=sink):
                 self.assertNotRegex(source, sink)
+
+    def test_dashboard_workspace_navigation_and_typed_attention_drilldown_contract(self) -> None:
+        source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
+        for token in (
+            'aria-label="Project Context workspaces"',
+            '<a data-mode="monitor" href="#attention">Monitor</a>',
+            '<a data-mode="remediate" href="#findings">Remediate',
+            '<a data-mode="explore" href="#project-map">Explore</a>',
+            '<a data-mode="govern" href="#decisions">Govern</a>',
+            '<li><a href="#project-map">Project topology</a></li>',
+            '<li><a href="#context-map">Context documents</a></li>',
+            'id="attention-inspector" aria-labelledby="attention-inspector-title"',
+            'systemAttention.push({kind: "integrity"',
+            '({kind: "finding", finding})',
+            'const button = make("button", "attention-item")',
+            'button.setAttribute("aria-controls", "attention-inspector")',
+            'button.setAttribute("aria-pressed", "false")',
+            'window.matchMedia("(max-width: 1120px)").matches',
+            'inspector.scrollIntoView({block: "start"})',
+            'if (item.kind !== "finding")',
+            'openFinding.addEventListener("click", () => openFullFinding(finding))',
+            'item.details.open = true',
+            'navigateWorkspace("#findings", () => {',
+            'item.details.querySelector("summary").focus()',
+            'navigateWorkspace("#context-map", () => {',
+            'activateMapTab(route.mapTab)',
+            'document.querySelector(".skip-link").addEventListener("click", (event) => {',
+            'form.setAttribute("action", `${window.location.pathname}${window.location.hash || "#attention"}`)',
+            'window.addEventListener("hashchange", update)',
+            'const views = new Map([',
+            '["#attention", {view: "attention", section: "overview"}]',
+            '["#project-map", {view: "map", section: "map", mapTab: "project"}]',
+            '["#context-map", {view: "map", section: "map", mapTab: "context"}]',
+            'byId(id).hidden = id !== route.section',
+            'byId("main").dataset.view = route.view',
+            'link.setAttribute("aria-current", "location")',
+            'link.setAttribute("aria-current", "page")',
+            'const selected = buttons.find((entry) => asText(entry.node.id) === selectedNodeId)',
+            'selectNode(asText(visible[0].node.id), false)',
+            'emptyState("No matching context artifact"',
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertNotIn('row.addEventListener("click"', source)
+
+    def test_focused_context_groups_pairs_but_preserves_raw_wikilink_occurrences(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            revision = self._commit_source(root, "baseline\n")
+            manifest = ProjectValidationTests._write_project(root, revision=revision)
+            documents = {
+                "PROJECT_CONTEXT.md": (
+                    '# Context\n\n<a id="self"></a>\n'
+                    '[[architecture]] [[architecture#target]] [[architecture#target|again]] [[context#self]]\n'
+                ),
+                "repodocs/architecture.md": (
+                    '# Architecture\n\n<a id="target"></a>\n[[context]] [[context#self]]\n'
+                ),
+            }
+            for relative, text in documents.items():
+                (root / relative).write_text(text, encoding="utf-8")
+                next(item for item in manifest["artifacts"] if item["path"] == relative)["sha256"] = sha256_text(text)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+
+            snapshot = dashboard_snapshot(root)
+            edges = snapshot["context_map"]["edges"]
+            self.assertEqual(6, snapshot["integrity"]["wikilinks"])
+            self.assertEqual(6, len(edges))
+            self.assertEqual(
+                Counter({("context", "architecture"): 3, ("architecture", "context"): 2, ("context", "context"): 1}),
+                Counter((edge["from"], edge["to"]) for edge in edges),
+            )
+            self.assertEqual(
+                Counter({"links to": 1, "links to #target": 2}),
+                Counter(edge["label"] for edge in edges if edge["from"] == "context" and edge["to"] == "architecture"),
+            )
+
+        source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
+        index_source = source.split("function contextRelationshipIndex", 1)[1].split(
+            "const contextRelationships", 1
+        )[0]
+        explorer_source = source.split("function renderContextExplorer", 1)[1].split(
+            "function renderProjectGraph", 1
+        )[0]
+        for token in (
+            "const key = JSON.stringify([from, to])",
+            "pair.occurrences += 1",
+            "pair.labels.add",
+            "pair.evidence.push",
+            "if (outgoing.has(pair.from))",
+            "if (incoming.has(pair.to))",
+            "repeated: Math.max(0, edges.length - pairs.size)",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, index_source)
+        for token in (
+            'return "Finding records"',
+            'return "Audit records"',
+            'return "Governance"',
+            'return "Canonical context"',
+            "${graph.edges.length} validated raw wikilink occurrences remain available as evidence",
+            "${pair.occurrences} validated occurrence",
+            '[...pair.labels].sort().join(", ")',
+            "const directPairs = [...new Set([...outgoing, ...incoming])]",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, explorer_source)
+        self.assertNotIn("Manifest-owned validated artifact.", explorer_source)
+        self.assertNotIn('renderMap(byId("context-map-panel")', source)
+
+    def test_findings_ai_prompt_has_safe_state_aware_lifecycle_contract(self) -> None:
+        source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
+        prompt_source = source.split("function remediationPrompt", 1)[1].split("function findingSearchText", 1)[0]
+        for token in (
+            '<th class="ai-prompt-cell" scope="col">AI Prompt</th>',
+            'kind: "recheck"',
+            'kind: "fix"',
+            'kind: "resolved"',
+            'kind: "refuted"',
+            ".finding-details > summary",
+            "STOP: this snapshot is stale or its freshness is unknown",
+            "Keep this historical id refuted forever",
+            "a comparable re-audit may return this resolved id to persisting",
+            'prompt_contract: "project-context-remediation-v1"',
+            "identity_sha256: asText(finding.identity_sha256)",
+            "Recompute identity_sha256 from the canonical record's complete identity object",
+            "evidence_locations: promptLocations(finding.evidence)",
+            "validate each completed auditor candidate against its own saved --previous file",
+            "previous findings scope, candidate findings scope, and candidate inventory scope",
+            "validate-findings --input <candidate-findings.json> --previous <saved-previous-findings.json>",
+            "validate-inventory --input <candidate-inventory.json> --previous <saved-previous-inventory.json>",
+            "Every completed auditor needs a findings document with the new run_id",
+            "A fresh read-only agent must perform blind verification",
+            "findings, trace ledger, decision rationale",
+            "write the manifest last",
+            "navigator.clipboard.writeText(prompt)",
+            "field.select()",
+            "search: findingSearchText(finding)",
+            "cell.colSpan = 8",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        for forbidden in (
+            "title: asText(finding.title)",
+            "assertion: asText(identity.assertion)",
+            "symbol: asText(identity.symbol)",
+            "detail: asText",
+            "note: asText(verification.note)",
+            "navigator.clipboard.read",
+            "document.execCommand",
+            "button.disabled = true",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, prompt_source)
+        self.assertNotIn(".finding-details summary", source)
+
+    def test_findings_master_prompt_binds_selected_active_snapshot_safely(self) -> None:
+        source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
+        master_source = source.split("function masterFindingBinding", 1)[1].split("function findingSearchText", 1)[0]
+        for token in (
+            'id="select-visible-findings"',
+            'id="copy-master-prompt"',
+            'id="master-prompt-preview"',
+            'class="selection-control"',
+            ".selection-control { display: inline-grid; width: 44px; height: 44px",
+            "const selectedFindingIds = new Set()",
+            "item.checkbox && !item.row.hidden",
+            "selectVisible.indeterminate",
+            'contextState !== "valid"',
+            'preview.addEventListener("toggle"',
+            "cell.colSpan = 8",
+            'prompt_contract: "project-context-master-remediation-v1"',
+            "expected_active_count: activeFindings.length",
+            "expected_active_findings: activeFindings.map",
+            "selected_findings: selected.map",
+            "identity_sha256: asText(finding.identity_sha256)",
+            "const MASTER_PROMPT_LIMITS = Object.freeze",
+            "new TextEncoder().encode(prompt).byteLength",
+            "Do not queue or dispatch work, create worktrees, edit code",
+            "the complete sorted active tuple set",
+            "never silently add or drop findings",
+            "Build an in-memory queue for the selected active IDs only",
+            "Before editing any selected original high/critical claim",
+            "the coordinator builds a conflict graph and assigns exclusive ownership",
+            "Workers never edit repodocs, inventory, project map, or manifest",
+            "Run `./tests/run --fast` only when it exists",
+            "otherwise record coverage-incomplete",
+            "before auditor dispatch",
+            "--allow-provisional",
+            "including newly discovered ones",
+            "repodocs/project-map.json uses the new run_id",
+            "preserve map nodes/edges unless evidence-backed topology changed",
+            "Withhold findings, this bulk payload, trace ledger",
+            "It may not execute project code, hooks, package managers, builds, tests, linters, plugins, generators, repository-configured tools, or use the network",
+            "Before any write, validate final findings",
+            "write repodocs/project-context.manifest.json last",
+            "Do not commit, push, open a PR, or deploy",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        for forbidden in (
+            "title: asText(finding.title)",
+            "assertion: asText(identity.assertion)",
+            "symbol: asText(identity.symbol)",
+            "detail: asText",
+            "note: asText(verification.note)",
+            "expected_active_count: 59",
+            "navigator.clipboard.read",
+            "document.execCommand",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, master_source)
+        self.assertLess(
+            master_source.index("activeFindings.length > MASTER_PROMPT_LIMITS.findings"),
+            master_source.index("let locationCount = 0"),
+        )
+        self.assertIn("if (locationCount > MASTER_PROMPT_LIMITS.locations)", master_source)
+        command_order = [
+            "validate-findings --input <candidate-findings.json>",
+            "validate-project-map --input <candidate-project-map.json>",
+            "validate-inventory --input <post-blind-candidate-inventory.json>",
+            "validate-manifest --input <candidate-manifest.json>",
+            "validate-project --repo <exact-root>",
+        ]
+        positions = [master_source.index(command) for command in command_order]
+        self.assertEqual(positions, sorted(positions))
 
     def test_project_graph_snapshot_preserves_adversarial_topology_safely(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

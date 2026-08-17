@@ -1319,6 +1319,11 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
                     "auditor": auditor,
                     "source_severity": finding["severity"],
                     "effective_severity": verification.get("resulting_severity") or finding["severity"],
+                    "identity_sha256": sha256_bytes(
+                        json.dumps(
+                            finding["identity"], ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                        ).encode("utf-8")
+                    ),
                 }
             )
     flattened.sort(
