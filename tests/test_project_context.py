@@ -1704,7 +1704,21 @@ class CliTests(unittest.TestCase):
             legacy = home / ".claude/skills/project-context"
             (legacy / "auditors").mkdir(parents=True)
             (legacy / "SKILL.md").write_text("legacy full clone\n", encoding="utf-8")
-            environment = {**os.environ, "PROJECT_CONTEXT_HOME": str(home), "PROJECT_CONTEXT_REPO": str(ROOT)}
+            fake_bin = home / "fakebin"
+            fake_bin.mkdir()
+            fake_tool = fake_bin / "jcodemunch-mcp"
+            fake_tool.write_text(
+                '#!/bin/sh\necho "$@" >> "$(dirname "$0")/calls.log"\n'
+                '[ "$1" = "--version" ] && echo "jcodemunch-mcp 9.9.9"\nexit 0\n',
+                encoding="utf-8",
+            )
+            fake_tool.chmod(0o755)
+            environment = {
+                **os.environ,
+                "PROJECT_CONTEXT_HOME": str(home),
+                "PROJECT_CONTEXT_REPO": str(ROOT),
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            }
             for _ in range(2):  # second run exercises the update path
                 result = subprocess.run(
                     ["bash", str(ROOT / "install.sh")], capture_output=True, env=environment, timeout=300
@@ -1717,6 +1731,9 @@ class CliTests(unittest.TestCase):
             backups = list((home / ".skill-backups").iterdir())
             self.assertEqual(1, len(backups))
             self.assertTrue((backups[0] / "auditors").is_dir())
+            calls = (fake_bin / "calls.log").read_text(encoding="utf-8")
+            self.assertIn("--version", calls)
+            self.assertIn("init --client auto --yes", calls)
 
     def test_missing_repo_is_user_correctable(self) -> None:
         result = self._run("preflight", "--repo", "/nonexistent/project-context-missing")

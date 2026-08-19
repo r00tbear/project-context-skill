@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/r00tbear/project-context-skill/main
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/r00tbear/project-context-skill/main/install.ps1 | iex"
 ```
 
-Both scripts do exactly the same thing: install the latest release under `~/.agents/skills/project-context`, add the small Claude adapter, archive any older copy they replace into `~/.skill-backups/` (nothing is ever deleted), and verify the result with the skill's own `self-check`. Re-running the same command later **updates** the skill. Read them first if you like — they are short and boring: [install.sh](install.sh) · [install.ps1](install.ps1).
+Both scripts do exactly the same thing: install the latest release under `~/.agents/skills/project-context`, add the small Claude adapter, **install and register [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp)** (the local code index the skill requires — see Requirements), archive any older copy they replace into `~/.skill-backups/` (nothing is ever deleted), and verify the result with the skill's own `self-check`. Re-running the same command later **updates** everything. Read them first if you like — they are short and boring: [install.sh](install.sh) · [install.ps1](install.ps1).
 
 Already installed? You can also just tell your agent: **“update the project-context skill”** — it knows how ([references/upgrade.md](references/upgrade.md)).
 
@@ -95,9 +95,9 @@ It binds to localhost, never executes your code, never calls the network, and ne
 
 ## Requirements
 
-- Git, Python 3.11+ (standard library only — no packages to install)
+- Git, Python 3.11+ (the skill itself is standard library only)
 - Claude Code and/or Codex
-- Optional: [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) — a local code index that makes audits cheaper and structural checks machine-verified; the skill uses it automatically when present.
+- [jCodeMunch](https://github.com/jgravelle/jcodemunch-mcp) — the local, offline code index the skill audits through. **The installer installs and registers it for you** (via `uv` or `pipx`); it makes audits an order of magnitude cheaper and lets structural claims be machine-checked instead of guessed. It runs entirely on your machine; the skill uses its private/offline profile.
 
 <details>
 <summary><b>Team / project installation (pin the skill inside the repository)</b></summary>

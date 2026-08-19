@@ -5,8 +5,10 @@
 #
 # Mirrors install.sh exactly: checks git and Python 3.11+, resolves the latest release
 # tag, installs/updates ~/.agents/skills/project-context, writes the Claude adapter,
-# archives any legacy copy into ~/.skill-backups (never deletes), runs self-check.
-# Overrides: PROJECT_CONTEXT_REPO, PROJECT_CONTEXT_VERSION, PROJECT_CONTEXT_HOME.
+# installs and registers jCodeMunch (required), archives any legacy copy into
+# ~/.skill-backups (never deletes), runs self-check.
+# Overrides: PROJECT_CONTEXT_REPO, PROJECT_CONTEXT_VERSION, PROJECT_CONTEXT_HOME,
+# PROJECT_CONTEXT_NO_JCODEMUNCH=1 (skip the jCodeMunch step, CI/hermetic).
 
 $ErrorActionPreference = "Stop"
 
@@ -82,6 +84,40 @@ if (Test-Path (Join-Path $Payload ".git")) {
 
 New-Item -ItemType Directory -Force -Path $AdapterDir | Out-Null
 Copy-Item (Join-Path $Payload "templates\host\claude-skill-adapter.md") (Join-Path $AdapterDir "SKILL.md") -Force
+
+# jCodeMunch: the local, offline code index the skill audits through. Required.
+if ($env:PROJECT_CONTEXT_NO_JCODEMUNCH -eq "1") {
+    Say "skipping jCodeMunch (PROJECT_CONTEXT_NO_JCODEMUNCH=1); the skill requires it at run time"
+} else {
+    if (-not (Get-Command jcodemunch-mcp -ErrorAction SilentlyContinue)) {
+        if (Get-Command uv -ErrorAction SilentlyContinue) {
+            Say "installing jCodeMunch with uv"
+            uv tool install --quiet jcodemunch-mcp
+            if ($LASTEXITCODE -ne 0) { Fail "uv tool install jcodemunch-mcp failed" }
+        } elseif (Get-Command pipx -ErrorAction SilentlyContinue) {
+            Say "installing jCodeMunch with pipx"
+            pipx install --quiet jcodemunch-mcp
+            if ($LASTEXITCODE -ne 0) { Fail "pipx install jcodemunch-mcp failed" }
+        } else {
+            Fail "jCodeMunch is required and neither uv nor pipx is available. Install uv first (https://docs.astral.sh/uv/): powershell -c `"irm https://astral.sh/uv/install.ps1 | iex`" - then re-run this installer."
+        }
+        # uv/pipx install into per-user bin directories that may not be on PATH yet.
+        $env:PATH = "$HOME\.local\bin;$env:LOCALAPPDATA\Programs\Python\Scripts;$env:PATH"
+    }
+    if (-not (Get-Command jcodemunch-mcp -ErrorAction SilentlyContinue)) {
+        Fail "jcodemunch-mcp installed but not on PATH; open a new terminal and re-run this installer."
+    }
+    $JVersion = jcodemunch-mcp --version 2>$null
+    Say "jCodeMunch $JVersion"
+    # Registration failures are not fatal: the skill's preflight re-checks and prints
+    # the same command, so the user is never stuck silently.
+    jcodemunch-mcp init --client auto --yes 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Say "registered the jCodeMunch MCP server with your detected agents"
+    } else {
+        Say "warning: automatic MCP registration failed; run manually: jcodemunch-mcp init --client auto --yes"
+    }
+}
 
 & $Python (Join-Path $Payload "scripts\project_context.py") self-check --skill-root $Payload | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "self-check failed; the installation is incomplete. Re-run the installer or file an issue." }

@@ -49,6 +49,7 @@ jobs:
         run: |
           export PROJECT_CONTEXT_HOME="$RUNNER_TEMP/pc-home"
           export PROJECT_CONTEXT_REPO="$PWD"
+          export PROJECT_CONTEXT_NO_JCODEMUNCH=1 # hermetic: no PyPI dependency in CI
           bash install.sh
           bash install.sh # second run must take the update path
           test -f "$PROJECT_CONTEXT_HOME/.agents/skills/project-context/VERSION"
@@ -59,6 +60,7 @@ jobs:
         run: |
           $env:PROJECT_CONTEXT_HOME = Join-Path $env:RUNNER_TEMP "pc-home"
           $env:PROJECT_CONTEXT_REPO = "$PWD"
+          $env:PROJECT_CONTEXT_NO_JCODEMUNCH = "1" # hermetic: no PyPI dependency in CI
           ./install.ps1
           ./install.ps1 # second run must take the update path
           if (-not (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION"))) { exit 1 }

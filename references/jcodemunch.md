@@ -1,6 +1,6 @@
 # jCodeMunch evidence workflow
 
-jCodeMunch is optional. Use it deeply when available, but only for formats supported by the live parser. It accelerates navigation and structural analysis; exact source/config evidence remains authoritative.
+jCodeMunch is required: the skill installer sets it up, and Preflight stops when its MCP tools do not answer (only an explicit user decision to proceed without the index overrides that, recorded in the run). Use it deeply, but only for formats supported by the live parser. It accelerates navigation and structural analysis; exact source/config evidence remains authoritative.
 
 ## 1. Establish the live contract
 
