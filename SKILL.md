@@ -95,7 +95,8 @@ Read `references/host-integration.md`.
 3. Ask that verifier to find omitted required topics, unsupported factual claims, unmapped fixed constraints, and broken reverse traceability. Fix confirmed issues or record unresolved gaps in `repodocs/audit/drift-report.md`, then rerun the blind check. Record `verification.blind: "passed"` with zero unresolved issues only after it passes; a failed blind check makes the run failed.
 4. Confirm that host blocks point to the same `PROJECT_CONTEXT.md`, conditional docs match domain states, the project map and findings use the latest `run_id`, wikilinks resolve, and every manifest artifact hash matches.
 5. Write `repodocs/project-context.manifest.json` last, then run `validate-project`. Treat validator success as structural proof, not a substitute for the blind factual-completeness pass.
-6. Report generated paths, skipped/partial coverage, unresolved TODOs, and the exact next action. Do not claim complete coverage when evidence was partial.
+6. After `validate-project` succeeds, enter Dashboard mode and keep its local server running so the user can inspect the verified result. Open the browser by default; skip opening only when the user explicitly declines or the environment cannot open one, and never claim the dashboard is running when the process cannot be kept alive.
+7. Report generated paths, skipped/partial coverage, unresolved TODOs, the dashboard URL or exact launch command, and the exact next action. Do not claim complete coverage when evidence was partial.
 
 ## Review mode
 
@@ -115,7 +116,9 @@ Read `references/diff-review.md`. Review is a workflow, not a bundled model runn
 3. Keep Project Context branding and show `Data refreshed` from the current dashboard snapshot separately from `Latest audit` in the latest inventory run.
 4. The Refresh button re-reads and re-validates canonical artifacts. If validation fails, show the invalid state and its sanitized reason; never mask it with cached data.
 5. Render the validated Project Map as browser-native SVG with focus/evidence inspection, upstream/downstream reach over authored edges, exact directed-route search, zoom/fit, and an accessible list fallback. These interactions never infer impact, missing links, or new topology.
-6. Show invalid, partial, stale, and unknown states explicitly. Never invent health scores, percentages, ETA, architecture edges, or freshness. Dashboard refresh time is not audit freshness.
+6. Keep the raw validated Context occurrences as truth, but make the default view a focused artifact explorer that aggregates exact directed source-target pairs and retains every fragment and evidence location on demand. Never infer relationships.
+7. Build each Findings AI prompt only from the validated snapshot's binding, lifecycle metadata, and evidence locations. Let users select active rows across filters and copy one capped, all-or-nothing Master Prompt bound to the exact dynamic active set and selected identity hashes; Select all affects only shown active rows. Omit finding prose, mark local content untrusted, stop stale/unknown prompts before queues or writes, serialize overlapping edits through one coordinator, and require comparable re-audit, previous-state validation, blind verification, approved aggregate preview, and manifest-last validation before closure. Copy and preview remain local read-only interactions.
+8. Show invalid, partial, stale, and unknown states explicitly. Never invent health scores, percentages, ETA, architecture edges, or freshness. Dashboard refresh time is not audit freshness.
 
 ## Resources
 

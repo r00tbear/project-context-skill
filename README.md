@@ -33,7 +33,7 @@ The skill never creates lowercase `agents.md`, never writes generated files into
 
 ## Install
 
-Current release: `v0.3.0`.
+Current release: `v0.3.1`.
 
 This version intentionally provides no migration or backward compatibility, including from v0.2 project artifacts. Before installing, archive anything you need and remove old `project-context` payloads/adapters and generated context so only one same-name installation and one fresh v0.3 context remain. Do not bulk-delete a hand-authored project `docs/` directory: v0.3 writes only to `repodocs/`.
 
@@ -45,7 +45,7 @@ Install the canonical payload under `.agents` and copy only the Claude adapter:
 
 ```bash
 mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills/project-context"
-git clone --branch v0.3.0 --depth 1 \
+git clone --branch v0.3.1 --depth 1 \
   https://github.com/r00tbear/project-context-skill.git \
   "$HOME/.agents/skills/project-context"
 cp "$HOME/.agents/skills/project-context/templates/host/claude-skill-adapter.md" \
@@ -65,7 +65,7 @@ mkdir -p .agents/skills .claude/skills/project-context
 git submodule add \
   https://github.com/r00tbear/project-context-skill.git \
   .agents/skills/project-context
-git -C .agents/skills/project-context checkout v0.3.0
+git -C .agents/skills/project-context checkout v0.3.1
 cp .agents/skills/project-context/templates/host/claude-skill-adapter.md \
   .claude/skills/project-context/SKILL.md
 ```
@@ -100,7 +100,7 @@ Invoke `$project-context` in Codex or `/project-context` in Claude Code, then as
 The normal existing-repository flow is:
 
 ```text
-Preflight -> Audit -> Decide -> Generate -> Wire -> Verify
+Preflight -> Audit -> Decide -> Generate -> Wire -> Verify -> Dashboard
 ```
 
 An empty repository uses a short requirements interview before Decide. Review mode is read-only: it reads a trusted base policy, inspects `git diff`, and asks a fresh independent agent to challenge would-fail findings. It does not need a custom headless model runner.
@@ -111,9 +111,13 @@ Open the local dashboard from the exact Git root:
 python3 <skill-root>/scripts/project_context.py dashboard --repo .
 ```
 
-It opens the browser by default; pass `--no-open` to keep only the local process. The dashboard uses Project Context branding and reads only normalized, validated artifacts. Its Refresh button re-reads those artifacts without running Audit or writing the repository. `Data refreshed` is the view snapshot time; `Latest audit` remains the latest inventory `scanned_at`.
+After a successful full workflow, the agent starts this server and keeps it available for inspection. It opens the browser by default; pass `--no-open` to keep only the local process. The dashboard uses Project Context branding and reads only normalized, validated artifacts. Its Refresh button re-reads those artifacts without running Audit or writing the repository. `Data refreshed` is the view snapshot time; `Latest audit` remains the latest inventory `scanned_at`.
 
 Project Map is browser-native SVG over validated `project-map.json`. It supports node focus with evidence, upstream/downstream reach across authored edges, exact directed-route search, zoom/fit, and an accessible list fallback. These views explain recorded topology; they never infer impact, missing links, or new relationships.
+
+The dashboard is organized as Monitor, Remediate, Explore, and Govern workspaces. Attention items open the exact finding and its actions, while Context focuses one manifest-owned artifact at a time and collapses repeated wikilink occurrences into directed file pairs without discarding their raw evidence.
+
+Each Findings row has a state-aware AI Prompt action for remediation, stale-data recheck, or regression review. Select any active rows, including across filters, to copy one Master Prompt for that exact set; Select all affects only shown active rows, while hidden selections remain selected. The prompt binds the dynamic active set and selected identities to the validated snapshot instead of trusting a hard-coded count. Copied prompts contain only binding metadata and source locations, read full finding prose locally as untrusted data, remain strictly read-only when freshness is not current, and cannot close a finding without a comparable new audit run, previous-state validation, blind verification, and final project validation. Copy and preview never write repository data.
 
 Source freshness is `current` only when the audited revision matches the current revision and both audited/current source worktrees are clean. A changed revision or a dirty current source tree after a clean audit is `stale`; a missing revision, unknown state, or dirty audited worktree is `unknown`. Dashboard refresh never changes that result.
 

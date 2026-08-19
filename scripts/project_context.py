@@ -1231,7 +1231,13 @@ def _markdown_sections(text: str, prefix: str | None = None) -> list[dict[str, s
                 body.append(candidate.strip())
             if len(body) == 8:
                 break
-        sections.append({"id": identifier, "title": title, "summary": "\n".join(body)})
+        meta = ""
+        for line in body:
+            found = re.search(r"Priority:\s*([^\s·]+)\s*·\s*Effort:\s*([^\s·]+)\s*·\s*Status:\s*(\S+)", line)
+            if found:
+                meta = f"{found.group(1)} · effort {found.group(2)} · {found.group(3)}"
+                break
+        sections.append({"id": identifier, "title": title, "summary": "\n".join(body), "lines": body, "meta": meta})
     return sections
 
 
@@ -1319,6 +1325,11 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
                     "auditor": auditor,
                     "source_severity": finding["severity"],
                     "effective_severity": verification.get("resulting_severity") or finding["severity"],
+                    "identity_sha256": sha256_bytes(
+                        json.dumps(
+                            finding["identity"], ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                        ).encode("utf-8")
+                    ),
                 }
             )
     flattened.sort(
