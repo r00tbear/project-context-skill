@@ -76,21 +76,21 @@
      "type": "array",
      "uniqueItems": true,
      "items": {
-      "$ref": "#/$defs/path"
+      "$ref": "#/$defs/scopePath"
      }
     },
     "excluded": {
      "type": "array",
      "uniqueItems": true,
      "items": {
-      "$ref": "#/$defs/path"
+      "$ref": "#/$defs/scopePath"
      }
     },
     "unscanned": {
      "type": "array",
      "uniqueItems": true,
      "items": {
-      "$ref": "#/$defs/path"
+      "$ref": "#/$defs/scopePath"
      }
     },
     "limitations": {
@@ -286,6 +286,12 @@
      }
     }
    }
+  },
+  "scopePath": {
+   "type": "string",
+   "minLength": 1,
+   "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\\\n\\r\\u0000])(?!.*[*?\\[]).+$",
+   "description": "Literal repository-relative path; glob characters are rejected by validate-findings."
   }
  }
 }

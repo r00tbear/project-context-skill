@@ -45,8 +45,8 @@ ID_RE = re.compile(r"[a-z][a-z0-9_-]*\Z")
 FINDING_ID_RE = re.compile(r"[a-z]+-[0-9]{3,}\Z")
 WIKILINK_RE = re.compile(r"\[\[([a-z][a-z0-9_-]*)(?:#([A-Za-z0-9][A-Za-z0-9_-]*))?(?:\|[^\]\n]+)?\]\]")
 WIKILINK_TOKEN_RE = re.compile(r"\[\[([^\[\]\n]+)\]\]")
-FENCED_CODE_RE = re.compile(r"^```.*?^```[ \t]*$", re.MULTILINE | re.DOTALL)
-INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+FENCED_CODE_RE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[ \t]*$", re.MULTILINE | re.DOTALL)
+INLINE_CODE_RE = re.compile(r"``[^`\n](?:[^`\n]|`(?!`))*``|`[^`\n]*`")
 
 
 def strip_code_spans(text: str) -> str:
@@ -254,6 +254,11 @@ def validate_config(value: Any) -> dict[str, Any]:
     _exact_keys(audit, {"exclude"}, "config.audit")
     excludes = _unique_strings(audit["exclude"], "config.audit.exclude")
     for index, path in enumerate(excludes):
+        if any(character in path for character in "*?[") or path.startswith(":"):
+            raise ContractError(
+                f"config.audit.exclude[{index}] contains glob or pathspec-magic characters; "
+                f"exclusions are literal repository-relative paths: {path}"
+            )
         validate_relative_path(path, f"config.audit.exclude[{index}]")
     return config
 
@@ -829,7 +834,18 @@ def _context_state(root: Path) -> tuple[str, str | None]:
 
 
 _INSTRUCTION_BASENAMES = {"agents.md", "claude.md", "claude.local.md", "agents.project-context.md"}
-_INSTRUCTION_CONFIG_FILES = {".claude/settings.json", ".claude/settings.local.json", ".claude/hooks.json", ".codex/config.toml"}
+_INSTRUCTION_CONFIG_FILES = {
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".claude/hooks.json",
+    ".claude/mcp.json",
+    ".codex/config.toml",
+    ".codex/hooks.json",
+    ".cursor/settings.json",
+    ".cursor/hooks.json",
+    ".cursor/mcp.json",
+}
+_SKILLS_ROOTS = (".github/skills/", ".claude/skills/", ".agents/skills/", ".codex/skills/", ".cursor/skills/")
 
 
 def _is_agent_instruction(path: str) -> bool:
@@ -838,12 +854,13 @@ def _is_agent_instruction(path: str) -> bool:
         return True
     if lowered in _INSTRUCTION_CONFIG_FILES:
         return True
-    if lowered.startswith(".cursor/rules/") or lowered.startswith(".cursor/commands"):
+    if lowered.startswith(".cursor/rules/") or lowered.startswith(".cursor/commands/") or lowered == ".cursor/commands":
         return True
-    for skills_root in (".github/skills/", ".claude/skills/", ".agents/skills/", ".codex/skills/"):
+    for skills_root in _SKILLS_ROOTS:
         if lowered.startswith(skills_root) and lowered.endswith(".md"):
             # One logical unit per vendored skill: its SKILL.md (any depth) or a file at the
-            # skills root. Internal reference files would flood the map fifty entries deep.
+            # skills root. Internal reference files would flood the map fifty entries deep;
+            # their divergence still surfaces through the skill-directory aggregate hash.
             remainder = lowered[len(skills_root):]
             return remainder.rsplit("/", 1)[-1] == "skill.md" or "/" not in remainder
     return False
@@ -851,10 +868,14 @@ def _is_agent_instruction(path: str) -> bool:
 
 def _instruction_hosts(path: str) -> list[str]:
     lowered = path.lower()
+    basename = lowered.rsplit("/", 1)[-1]
     hosts: list[str] = []
-    if lowered.rsplit("/", 1)[-1] in {"claude.md", "claude.local.md"} or lowered.startswith(".claude/"):
+    # Basename rules apply only outside other hosts' directories: .cursor/commands/agents.md
+    # is a cursor command that happens to be named agents, not a codex file.
+    foreign = lowered.startswith((".cursor/", ".github/"))
+    if (basename in {"claude.md", "claude.local.md"} and not foreign) or lowered.startswith(".claude/"):
         hosts.append("claude")
-    if lowered.rsplit("/", 1)[-1] in {"agents.md", "agents.project-context.md"} or lowered.startswith((".codex/", ".agents/")):
+    if (basename in {"agents.md", "agents.project-context.md"} and not foreign) or lowered.startswith((".codex/", ".agents/")):
         hosts.append("codex")
     if lowered.startswith(".cursor/"):
         hosts.append("cursor")
@@ -863,19 +884,51 @@ def _instruction_hosts(path: str) -> list[str]:
     return hosts or ["unknown"]
 
 
-def _agent_instruction_map(root: Path) -> list[dict[str, Any]]:
+def _skill_directory_digest(root: Path, skill_md: str) -> str | None:
+    """Aggregate hash over a vendored skill directory, so divergence in any of its files
+    (not only SKILL.md) surfaces on the one entry that represents the skill."""
+    lowered = skill_md.lower()
+    for skills_root in _SKILLS_ROOTS:
+        if lowered.startswith(skills_root) and lowered.rsplit("/", 1)[-1] == "skill.md":
+            skill_dir = (root / skill_md).parent
+            lines: list[str] = []
+            for directory, dirnames, filenames in os.walk(skill_dir, followlinks=False):
+                dirnames[:] = sorted(d for d in dirnames if not (Path(directory) / d).is_symlink())
+                for name in sorted(filenames):
+                    file_path = Path(directory) / name
+                    if file_path.is_symlink() or not file_path.is_file():
+                        continue
+                    relative = file_path.relative_to(skill_dir).as_posix()
+                    try:
+                        lines.append(f"{relative}:{sha256_bytes(_read_regular(file_path, relative))}")
+                    except ContractError:
+                        continue
+                    if len(lines) == 400:
+                        return sha256_text("\n".join([*lines, "truncated"]))
+            return sha256_text("\n".join(lines))
+    return None
+
+
+def _agent_instruction_map(root: Path) -> tuple[list[dict[str, Any]], bool]:
     """Inventory every file that can instruct an agent. Discovery honours the repository's
-    own ignore rules, except host-configuration directories, which are always checked."""
-    tracked_result = _git(root, "ls-files", "-z")
+    own ignore rules, except the root host files and host-configuration directories, which
+    are always checked - an ignore rule must never hide an instruction file from the map."""
+    try:
+        tracked_result = _git(root, "ls-files", "-z")
+        others_result = _git(root, "ls-files", "-z", "--others", "--exclude-standard")
+    except ContractError:
+        return [], True
     tracked = {p for p in tracked_result.stdout.split("\0") if p} if tracked_result.returncode == 0 else set()
-    others_result = _git(root, "ls-files", "-z", "--others", "--exclude-standard")
     others = {p for p in others_result.stdout.split("\0") if p} if others_result.returncode == 0 else set()
     candidates = {p for p in tracked | others if _is_agent_instruction(p)}
-    for extra in ("CLAUDE.local.md", ".claude", ".agents", ".codex", ".cursor"):
+    # Root host files by exact directory listing, so a git-ignored CLAUDE.md is still seen.
+    try:
+        candidates.update(name for name in os.listdir(root) if name.lower() in _INSTRUCTION_BASENAMES)
+    except OSError:
+        pass
+    for extra in (".claude", ".agents", ".codex", ".cursor", ".github"):
         base = root / extra
-        if base.is_file() and not base.is_symlink():
-            candidates.add(extra)
-        elif base.is_dir() and not base.is_symlink():
+        if base.is_dir() and not base.is_symlink():
             for directory, dirnames, filenames in os.walk(base, followlinks=False):
                 dirnames[:] = [d for d in dirnames if not (Path(directory) / d).is_symlink()]
                 for name in filenames:
@@ -886,37 +939,50 @@ def _agent_instruction_map(root: Path) -> list[dict[str, Any]]:
                     if _is_agent_instruction(relative):
                         candidates.add(relative)
     entries: list[dict[str, Any]] = []
+    truncated = False
     for relative in sorted(candidates):
         path = root / relative
         if not path.is_file() or path.is_symlink():
             continue
         try:
             raw = _read_regular(path, relative)
-        except ContractError:
+            modified = datetime.fromtimestamp(path.lstat().st_mtime, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        except (ContractError, OSError):
             continue
         entries.append(
             {
                 "path": relative,
                 "tracked": relative in tracked,
                 "size": len(raw),
-                "sha256": sha256_bytes(raw),
+                "sha256": _skill_directory_digest(root, relative) or sha256_bytes(raw),
+                "modified": modified,
                 "hosts": _instruction_hosts(relative),
             }
         )
         if len(entries) == 200:
+            truncated = True
             break
-    return entries
+    return entries, truncated
 
 
 def _scope_review(root: Path, exclusions: list[str]) -> list[dict[str, Any]]:
     """Cross-check configured exclusions against git without changing what gets scanned."""
     review: list[dict[str, Any]] = []
     for excluded in exclusions:
-        ls_result = _git(root, "ls-files", "-z", "--", excluded)
-        tracked_files = [p for p in ls_result.stdout.split("\0") if p] if ls_result.returncode == 0 else []
-        # --no-index: pure pattern matching, so a TRACKED path that ignore rules also match
-        # is reported - that combination is a no-op ignore and usually a forgotten git rm --cached.
-        ignored = _git(root, "check-ignore", "-q", "--no-index", "--", excluded).returncode == 0
+        try:
+            # :(literal) disables pathspec magic and globbing, matching _covered_by's
+            # literal semantics; validate_config also rejects glob/magic characters.
+            ls_result = _git(root, "ls-files", "-z", "--", f":(literal){excluded}")
+            tracked_files = [p for p in ls_result.stdout.split("\0") if p] if ls_result.returncode == 0 else []
+            # --no-index: pure pattern matching, so a TRACKED path that ignore rules also match
+            # is reported - that combination is a no-op ignore and usually a forgotten git rm --cached.
+            # The empty core.excludesfile neutralises the user's personal global ignores: only the
+            # repository's own .gitignore and .git/info/exclude count as an inconsistency.
+            ignored = (
+                _git(root, "-c", "core.excludesfile=", "check-ignore", "-q", "--no-index", "--", excluded).returncode == 0
+            )
+        except ContractError:
+            continue
         review.append(
             {
                 "path": excluded,
@@ -928,17 +994,27 @@ def _scope_review(root: Path, exclusions: list[str]) -> list[dict[str, Any]]:
     return review
 
 
+_DECISION_ID_RE = re.compile(r"(?<![A-Za-z0-9])(ADR|MB)-[0-9]+(?![0-9])")
+
+
 def _decision_citations(root: Path) -> list[dict[str, Any]]:
     """Existing ADR/MB citations in tracked files outside repodocs/; generation must not collide with them."""
-    result = _git(root, "grep", "-I", "-o", "-E", r"(ADR|MB)-[0-9]+", "--", ".", ":(exclude)repodocs")
+    try:
+        # -z separates the path from the matched line with NUL, so paths containing ':' parse
+        # exactly; ids are re-extracted in Python with word boundaries, so prose like
+        # "512MB-4GB" or "LOADR-9" never registers as an occupied decision id.
+        result = _git(root, "grep", "-I", "-z", "-E", r"(ADR|MB)-[0-9]+", "--", ".", ":(exclude)repodocs")
+    except ContractError:
+        return []
     if result.returncode != 0:
         return []
     citations: dict[str, set[str]] = {}
     for line in result.stdout.splitlines():
-        path, _, match = line.rpartition(":")
-        if not path or not re.fullmatch(r"(ADR|MB)-[0-9]+", match):
+        path, separator, content = line.partition("\0")
+        if not separator or not path:
             continue
-        citations.setdefault(match, set()).add(path)
+        for match in _DECISION_ID_RE.finditer(content):
+            citations.setdefault(match.group(0), set()).add(path)
     return [
         {"id": citation_id, "file_count": len(files), "files": sorted(files)[:20]}
         for citation_id, files in sorted(citations.items())
@@ -1022,7 +1098,7 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
             exclusions = list(config["audit"]["exclude"])
         except ContractError:
             exclusions = []  # an invalid config is already reported through context_state
-    instruction_map = _agent_instruction_map(root)
+    instruction_map, instructions_truncated = _agent_instruction_map(root)
     for entry in instruction_map:
         entry["in_excluded_scope"] = _covered_by(entry["path"], exclusions)
     effective_skill = _resolve_existing(skill_root or Path(__file__).resolve().parents[1], "skill root")
@@ -1042,6 +1118,7 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         "scope_review": _scope_review(root, exclusions),
         "decision_citations": _decision_citations(root),
         "agent_instructions": instruction_map,
+        "agent_instructions_truncated": instructions_truncated,
         "skill_root": str(effective_skill),
     }
 
@@ -1294,6 +1371,10 @@ def _validated_project(repo: Path) -> dict[str, Any]:
         for finding in findings["findings"]:
             if finding["status"] not in {"new", "persisting"}:
                 continue
+            if finding["kind"] in {"scope-inconsistency", "agent-directed-text"}:
+                # scope_review-driven findings point inside a confirmed exclusion by design:
+                # the exclusion is exactly what they report on.
+                continue
             paths = [finding["identity"]["path"]]
             paths.extend(item["path"] for item in finding["evidence"])
             paths.extend(item["path"] for item in finding["verification"]["counterevidence"])
@@ -1499,6 +1580,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
     }
     if current["context_state"] != "valid":
         model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], None)
+        model["agent_instructions_truncated"] = current["agent_instructions_truncated"]
         model["snapshot_id"] = _snapshot_id(model)
         return model
 
@@ -1509,6 +1591,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         model["context"]["error"] = str(exc).replace(str(root), "<repo>")
         model["integrity"]["status"] = "invalid"
         model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], None)
+        model["agent_instructions_truncated"] = current["agent_instructions_truncated"]
         model["snapshot_id"] = _snapshot_id(model)
         return model
 
@@ -1612,6 +1695,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         "limitations": limitations,
     }
     model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], markdown)
+    model["agent_instructions_truncated"] = current["agent_instructions_truncated"]
     model["snapshot_id"] = _snapshot_id(model)
     return model
 

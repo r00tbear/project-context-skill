@@ -28,6 +28,7 @@ Each finding contains:
 - IDs are unique `<auditor>-NNN` values and are never reused. Preserve resolved/refuted entries.
 - Keep an ID only when kind and normalized identity path/symbol/assertion still describe the same fact. Shared path alone is insufficient.
 - Mark a prior finding resolved only when its subject was inside comparable completed scope.
+- Active findings must lie inside completed audit scope, with one documented exception: kinds `scope-inconsistency` and `agent-directed-text` may point inside a confirmed exclusion - the exclusion is exactly what they report on (preflight `scope_review` routes them).
 - Critical/high active candidates require an independent verification result before Decide. `refuted` findings stay in history and do not enter decisions.
 - `pending` is valid only for an active high/critical candidate during `validate-findings --allow-provisional`; replace it and run final validation before persistence or Decide.
 - A refuted verification marks the finding `refuted`; a downgrade names a strictly lower resulting severity.

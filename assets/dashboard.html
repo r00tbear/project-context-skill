@@ -1951,7 +1951,7 @@
           header.append(heading, close);
           const section = make("section", "inspector-section");
           section.append(make("h4", "", "Why this needs attention"), make("p", "", asText(item.detail, "No detail recorded.")));
-          section.append(make("p", "run-level-note", "Run-level condition: it describes this audit run, not the code, and is resolved by a new run (with adjusted scope or coverage where needed) - not by a code change."));
+          if (item.runLevel) section.append(make("p", "run-level-note", "Run-level condition: it describes this audit run, not the code, and is resolved by a new run (with adjusted scope or coverage where needed) - not by a code change."));
           const actions = make("div", "inspector-actions");
           const link = make("a", "primary-action", "Open audit health");
           link.href = asText(item.href, "#integrity");
@@ -2147,11 +2147,11 @@
         const systemAttention = [];
         if (contextState === "invalid") systemAttention.push({kind: "integrity", id: "INTEGRITY", title: "Integrity is invalid", detail: asText(context.error, "Validated project context is unavailable."), href: "#integrity"});
         if (contextState === "absent") systemAttention.push({kind: "integrity", id: "CONTEXT", title: "Context is not installed", detail: "No validated Project Context artifacts were found. Ask your agent to run the Project Context audit, then press Refresh.", href: "#integrity"});
-        if (latestAudit.outcome && latestAudit.outcome !== "complete") systemAttention.push({kind: "integrity", id: "COVERAGE", title: "Audit coverage is incomplete", detail: `Latest outcome: ${titleCase(latestAudit.outcome)}.`, href: "#history"});
+        if (latestAudit.outcome && latestAudit.outcome !== "complete") systemAttention.push({kind: "integrity", runLevel: true, id: "COVERAGE", title: "Audit coverage is incomplete", detail: `Latest outcome: ${titleCase(latestAudit.outcome)}.`, href: "#history"});
         const unscanned = asArray(asObject(latestAudit.scope).unscanned);
-        if (unscanned.length) systemAttention.push({kind: "integrity", id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});
-        if (blind === "failed") systemAttention.push({kind: "integrity", id: "BLIND CHECK", title: "Blind verification failed", detail: `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`, href: "#integrity"});
-        if (blind === "not-run") systemAttention.push({kind: "integrity", id: "BLIND CHECK", title: "Blind verification was not run", detail: "Factual completeness was not independently checked for this run.", href: "#integrity"});
+        if (unscanned.length) systemAttention.push({kind: "integrity", runLevel: true, id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});
+        if (blind === "failed") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification failed", detail: `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`, href: "#integrity"});
+        if (blind === "not-run") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification was not run", detail: "Factual completeness was not independently checked for this run.", href: "#integrity"});
         const urgentFindings = active.filter((finding) => ["critical", "high"].includes(currentSeverity(finding))).sort(compareFindings);
         const attention = [...systemAttention, ...urgentFindings.slice(0, 5).map((finding) => ({kind: "finding", finding}))];
         const totalAttention = systemAttention.length + urgentFindings.length;
@@ -3493,7 +3493,8 @@
         byId("instructions-summary").textContent =
           `${agentInstructions.length} file${agentInstructions.length === 1 ? "" : "s"} · ${trackedCount} tracked · ${agentInstructions.length - trackedCount} local-only`
           + ` · ${duplicateGroups.length} duplicate group${duplicateGroups.length === 1 ? "" : "s"}`
-          + (danglingCount ? ` · ${danglingCount} with dangling repodocs links` : "");
+          + (danglingCount ? ` · ${danglingCount} with dangling repodocs links` : "")
+          + (snapshot.agent_instructions_truncated ? " · list truncated at 200 entries - the full set is larger" : "");
         const list = make("div", "document-list");
         agentInstructions.forEach((entry) => {
           const details = make("details", "document-entry");
@@ -3502,13 +3503,15 @@
           const flags = [
             entry.tracked ? "tracked" : "local-only",
             asArray(entry.hosts).join("/"),
-            `${asCount(entry.size)} bytes`
+            `${asCount(entry.size)} bytes`,
+            asText(entry.modified) ? `modified ${formatDate(entry.modified)}` : ""
           ];
           if (entry.in_excluded_scope) flags.push("inside excluded audit scope");
           const members = groups.get(instructionGroupKey(asText(entry.path))) || [];
           if (members.length > 1) {
             const identical = new Set(members.map((member) => asText(member.sha256))).size === 1;
-            flags.push(identical ? `duplicate ×${members.length} (identical)` : `duplicate ×${members.length} (DIVERGED)`);
+            if (identical) flags.push(`duplicate ×${members.length} (identical)`);
+            else flags.push(`duplicate ×${members.length} (DIVERGED) · this copy ${asText(entry.sha256).slice(7, 15)}`);
           }
           const dangling = asArray(entry.links).filter((link) => String(asObject(link).status).startsWith("dangling"));
           if (dangling.length) flags.push(`${dangling.length} dangling link${dangling.length === 1 ? "" : "s"}`);

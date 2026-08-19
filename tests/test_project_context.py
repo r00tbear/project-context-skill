@@ -288,6 +288,17 @@ class DocumentValidationTests(unittest.TestCase):
         self.assertIn("[[context]]", stripped)
         self.assertNotIn("ADR-025", stripped)
         self.assertNotIn("fenced", stripped)
+        self.assertNotIn("double", strip_code_spans("Quoted ``[[double#Anchor]]`` example."))
+        self.assertNotIn("tilde", strip_code_spans("~~~\n[[tilde#Anchor]]\n~~~\n"))
+        mixed = strip_code_spans("```\ncode\n   ```\nreal [[context]] text\n```\nmore code\n```\n")
+        self.assertIn("[[context]]", mixed)
+
+    def test_config_excludes_are_literal_paths(self) -> None:
+        for bad in ("packages/*", ":!keep", "app/[locale]"):
+            value = config()
+            value["audit"]["exclude"] = [bad]
+            with self.assertRaisesRegex(ContractError, "glob or pathspec-magic"):
+                validate_config(value)
 
     def test_resulting_severity_must_match_unless_downgraded(self) -> None:
         value = finding_document()
@@ -1099,7 +1110,7 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "notes.ts").write_text("// per ADR-031 and MB-022\n// see ADR-031 again\n", encoding="utf-8")
+            (root / "notes.ts").write_text("// per ADR-031 and MB-022\n// see ADR-031 again\n// heap sized 512MB-4GB and a LOADR-9 register are not decision ids\n", encoding="utf-8")
             (root / "repodocs").mkdir()
             (root / "repodocs/decisions.md").write_text("ADR-099 must not be reported\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
@@ -1119,13 +1130,32 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             (root / ".agents/skills/demo/reference").mkdir(parents=True)
             (root / ".agents/skills/demo/SKILL.md").write_text("skill\n", encoding="utf-8")
             (root / ".agents/skills/demo/reference/deep.md").write_text("internal\n", encoding="utf-8")
+            (root / "CLAUDE.md").write_text("ignored root host file\n", encoding="utf-8")
+            (root / ".gitignore").write_text("/CLAUDE.md\n", encoding="utf-8")
             entries = {entry["path"]: entry for entry in preflight(root)["agent_instructions"]}
             self.assertIn("AGENTS.md", entries)
             self.assertTrue(entries["AGENTS.md"]["tracked"])
+            self.assertIn("CLAUDE.md", entries)
+            self.assertFalse(entries["CLAUDE.md"]["tracked"])
             self.assertIn(".cursor/rules/style.mdc", entries)
             self.assertFalse(entries[".cursor/rules/style.mdc"]["tracked"])
             self.assertIn(".agents/skills/demo/SKILL.md", entries)
             self.assertNotIn(".agents/skills/demo/reference/deep.md", entries)
+            self.assertIn("modified", entries["AGENTS.md"])
+
+    def test_skill_directory_digest_sees_reference_divergence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            for host in (".agents", ".claude"):
+                (root / host / "skills/demo/reference").mkdir(parents=True)
+                (root / host / "skills/demo/SKILL.md").write_text("same skill body\n", encoding="utf-8")
+                (root / host / "skills/demo/reference/deep.md").write_text("shared\n", encoding="utf-8")
+            entries = {entry["path"]: entry["sha256"] for entry in preflight(root)["agent_instructions"]}
+            self.assertEqual(entries[".agents/skills/demo/SKILL.md"], entries[".claude/skills/demo/SKILL.md"])
+            (root / ".agents/skills/demo/reference/deep.md").write_text("diverged\n", encoding="utf-8")
+            entries = {entry["path"]: entry["sha256"] for entry in preflight(root)["agent_instructions"]}
+            self.assertNotEqual(entries[".agents/skills/demo/SKILL.md"], entries[".claude/skills/demo/SKILL.md"])
 
     def test_preflight_requires_exact_git_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
