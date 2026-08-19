@@ -33,7 +33,7 @@ The skill never creates lowercase `agents.md`, never writes generated files into
 
 ## Install
 
-Current release: `v0.3.1`.
+Current release: `v0.3.2`.
 
 This version intentionally provides no migration or backward compatibility, including from v0.2 project artifacts. Before installing, archive anything you need and remove old `project-context` payloads/adapters and generated context so only one same-name installation and one fresh v0.3 context remain. Do not bulk-delete a hand-authored project `docs/` directory: v0.3 writes only to `repodocs/`.
 
@@ -45,7 +45,7 @@ Install the canonical payload under `.agents` and copy only the Claude adapter:
 
 ```bash
 mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills/project-context"
-git clone --branch v0.3.1 --depth 1 \
+git clone --branch v0.3.2 --depth 1 \
   https://github.com/r00tbear/project-context-skill.git \
   "$HOME/.agents/skills/project-context"
 cp "$HOME/.agents/skills/project-context/templates/host/claude-skill-adapter.md" \
@@ -65,7 +65,7 @@ mkdir -p .agents/skills .claude/skills/project-context
 git submodule add \
   https://github.com/r00tbear/project-context-skill.git \
   .agents/skills/project-context
-git -C .agents/skills/project-context checkout v0.3.1
+git -C .agents/skills/project-context checkout v0.3.2
 cp .agents/skills/project-context/templates/host/claude-skill-adapter.md \
   .claude/skills/project-context/SKILL.md
 ```
