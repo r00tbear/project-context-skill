@@ -95,7 +95,8 @@ Read `references/host-integration.md`.
 3. Ask that verifier to find omitted required topics, unsupported factual claims, unmapped fixed constraints, and broken reverse traceability. Fix confirmed issues or record unresolved gaps in `repodocs/audit/drift-report.md`, then rerun the blind check. Record `verification.blind: "passed"` with zero unresolved issues only after it passes; a failed blind check makes the run failed.
 4. Confirm that host blocks point to the same `PROJECT_CONTEXT.md`, conditional docs match domain states, the project map and findings use the latest `run_id`, wikilinks resolve, and every manifest artifact hash matches.
 5. Write `repodocs/project-context.manifest.json` last, then run `validate-project`. Treat validator success as structural proof, not a substitute for the blind factual-completeness pass.
-6. Report generated paths, skipped/partial coverage, unresolved TODOs, and the exact next action. Do not claim complete coverage when evidence was partial.
+6. After `validate-project` succeeds, enter Dashboard mode and keep its local server running so the user can inspect the verified result. Open the browser by default; skip opening only when the user explicitly declines or the environment cannot open one, and never claim the dashboard is running when the process cannot be kept alive.
+7. Report generated paths, skipped/partial coverage, unresolved TODOs, the dashboard URL or exact launch command, and the exact next action. Do not claim complete coverage when evidence was partial.
 
 ## Review mode
 

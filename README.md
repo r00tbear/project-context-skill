@@ -100,7 +100,7 @@ Invoke `$project-context` in Codex or `/project-context` in Claude Code, then as
 The normal existing-repository flow is:
 
 ```text
-Preflight -> Audit -> Decide -> Generate -> Wire -> Verify
+Preflight -> Audit -> Decide -> Generate -> Wire -> Verify -> Dashboard
 ```
 
 An empty repository uses a short requirements interview before Decide. Review mode is read-only: it reads a trusted base policy, inspects `git diff`, and asks a fresh independent agent to challenge would-fail findings. It does not need a custom headless model runner.
@@ -111,7 +111,7 @@ Open the local dashboard from the exact Git root:
 python3 <skill-root>/scripts/project_context.py dashboard --repo .
 ```
 
-It opens the browser by default; pass `--no-open` to keep only the local process. The dashboard uses Project Context branding and reads only normalized, validated artifacts. Its Refresh button re-reads those artifacts without running Audit or writing the repository. `Data refreshed` is the view snapshot time; `Latest audit` remains the latest inventory `scanned_at`.
+After a successful full workflow, the agent starts this server and keeps it available for inspection. It opens the browser by default; pass `--no-open` to keep only the local process. The dashboard uses Project Context branding and reads only normalized, validated artifacts. Its Refresh button re-reads those artifacts without running Audit or writing the repository. `Data refreshed` is the view snapshot time; `Latest audit` remains the latest inventory `scanned_at`.
 
 Project Map is browser-native SVG over validated `project-map.json`. It supports node focus with evidence, upstream/downstream reach across authored edges, exact directed-route search, zoom/fit, and an accessible list fallback. These views explain recorded topology; they never infer impact, missing links, or new relationships.
 

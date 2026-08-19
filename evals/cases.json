@@ -81,9 +81,9 @@
     {
       "id": "workflow-phase-updates",
       "request": "Run the full Project Context workflow for an existing repository.",
-      "setup": ["The workflow requires Preflight, Audit, Decide, Generate, Wire, and Verify", "Some audit coverage is incomplete until a later phase"],
-      "expected": ["Send one concise user-visible update at each phase boundary", "State the evidence-backed phase result and next action", "Keep incomplete coverage explicit until resolved"],
-      "forbidden": ["Invent completion percentages", "Invent ETA", "Persist conversational progress as project state", "Claim completion before blind verification and validate-project pass"]
+      "setup": ["The workflow requires Preflight, Audit, Decide, Generate, Wire, Verify, and Dashboard", "Some audit coverage is incomplete until a later phase"],
+      "expected": ["Send one concise user-visible update at each phase boundary", "State the evidence-backed phase result and next action", "Keep incomplete coverage explicit until resolved", "After validate-project succeeds, start the local dashboard server and keep it available for inspection"],
+      "forbidden": ["Invent completion percentages", "Invent ETA", "Persist conversational progress as project state", "Open the dashboard before blind verification and validate-project pass", "Claim the dashboard is running when its process cannot be kept alive"]
     },
     {
       "id": "blind-final-verification",
