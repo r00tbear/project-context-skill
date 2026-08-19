@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "skill_version": "<VERSION at run time>",
+  "runs": [
+    {
+      "case_id": "<id from cases.json>",
+      "run_at": "<ISO-8601 UTC>",
+      "passed": false,
+      "expected_met": ["<one literal expected item that was met>"],
+      "expected_missed": [],
+      "forbidden_hit": [],
+      "notes": "<short neutral note; never paste agent output wholesale>"
+    }
+  ]
+}

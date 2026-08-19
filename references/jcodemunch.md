@@ -40,6 +40,7 @@ Then route targeted calls by audit topic:
 | bloat | `get_dead_code_v2`, similarity, references, and `check_delete_safe` |
 | security | bounded context/references at evidenced trust boundaries; never secret search |
 | testing | `get_untested_symbols` joined with hotspots/references and exact test evidence |
+| instruction map (Preflight) | `audit_agent_config` for stale-symbol and dead-file-path rows only; each row confirmed by a direct read of the cited config line. Our hash-based duplicate detection stays authoritative; the tool's redundancy/token-cost output is dropped, never a finding |
 
 Use the smallest evidence-driven scope and result cap. Unsupported tools/formats are explicit skips, not clean results.
 

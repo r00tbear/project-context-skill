@@ -202,10 +202,14 @@ def safe_path(root: Path, relative: Any, *, must_exist: bool = False) -> Path:
         candidate = candidate / part
         if os.path.lexists(candidate):
             try:
-                mode = os.lstat(candidate).st_mode
+                lstat_result = os.lstat(candidate)
             except OSError as exc:
                 raise ContractError(f"cannot inspect {rel}: {exc.strerror or exc}") from exc
-            if stat.S_ISLNK(mode):
+            # Junctions (IO_REPARSE_TAG_MOUNT_POINT) are the reparse points that behave like
+            # directory symlinks; other reparse tags (cloud placeholders, app-exec aliases)
+            # are ordinary files and must not be rejected.
+            reparse_tag = getattr(lstat_result, "st_reparse_tag", 0)
+            if stat.S_ISLNK(lstat_result.st_mode) or reparse_tag == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003):
                 raise ContractError(f"symlink is not allowed in generated path: {rel}")
     try:
         candidate.resolve(strict=False).relative_to(root)
@@ -718,7 +722,7 @@ def _source_evidence(root: Path, generated_files: set[str] | None = None) -> lis
                 continue
             if any(rel == prefix or rel.startswith(prefix + "/") for prefix in ignored_prefixes):
                 continue
-            if (Path(directory) / name).is_symlink():
+            if _is_symlink_or_junction(Path(directory) / name):
                 evidence.append(rel)
                 if len(evidence) == 20:
                     return sorted(evidence)
@@ -732,7 +736,7 @@ def _source_evidence(root: Path, generated_files: set[str] | None = None) -> lis
                 continue
             if any(rel.startswith(prefix + "/") for prefix in ignored_prefixes):
                 continue
-            if path.is_symlink():
+            if _is_symlink_or_junction(path):
                 evidence.append(rel)
                 if len(evidence) == 20:
                     return sorted(evidence)
@@ -804,6 +808,27 @@ def _host_user_content_changed(root: Path, relative: str, host: str) -> bool:
     return current != expected
 
 
+def _is_symlink_or_junction(path: Path) -> bool:
+    """NTFS junctions are reparse points that Path.is_symlink() does not report; every
+    symlink guard in this file must treat them the same way, or Windows silently passes
+    what macOS and Linux reject."""
+    if path.is_symlink():
+        return True
+    if os.name == "nt":
+        is_junction = getattr(path, "is_junction", None)
+        if is_junction is not None:  # Python 3.12+
+            try:
+                return bool(is_junction())
+            except OSError:
+                return False
+        try:
+            reparse_tag = getattr(os.lstat(path), "st_reparse_tag", 0)
+        except OSError:
+            return False
+        return reparse_tag == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
+    return False
+
+
 def _resolve_existing(path: Path, label: str) -> Path:
     try:
         return path.resolve(strict=True)
@@ -815,15 +840,23 @@ def _context_state(root: Path) -> tuple[str, str | None]:
     repodocs = root / "repodocs"
     has_repodocs = repodocs.is_dir() and any(repodocs.iterdir())
     has_managed_host = False
+    host_problem: str | None = None
     for host, relative in HOST_FILES.items():
         path = root / relative
         if path.is_file():
-            text = _decode_text(_read_regular(path, relative), relative)
-            has_managed_host = has_managed_host or extract_host_block(text, host) is not None
+            try:
+                text = _decode_text(_read_regular(path, relative), relative)
+                has_managed_host = has_managed_host or extract_host_block(text, host) is not None
+            except ContractError as exc:
+                # A broken host file (symlink, non-UTF-8, malformed markers) is a reportable
+                # invalid state, never a crash - the dashboard must be able to show it.
+                host_problem = f"{relative}: {str(exc).replace(str(root), '<repo>')}"
     has_surface = has_repodocs or has_managed_host or any(
         os.path.lexists(root / relative)
         for relative in (CONFIG_PATH, MANIFEST_PATH, "PROJECT_CONTEXT.md")
     )
+    if host_problem is not None:
+        return ("invalid", host_problem) if has_surface else ("absent", None)
     if not has_surface:
         return "absent", None
     try:
@@ -893,10 +926,10 @@ def _skill_directory_digest(root: Path, skill_md: str) -> str | None:
             skill_dir = (root / skill_md).parent
             lines: list[str] = []
             for directory, dirnames, filenames in os.walk(skill_dir, followlinks=False):
-                dirnames[:] = sorted(d for d in dirnames if not (Path(directory) / d).is_symlink())
+                dirnames[:] = sorted(d for d in dirnames if not _is_symlink_or_junction(Path(directory) / d))
                 for name in sorted(filenames):
                     file_path = Path(directory) / name
-                    if file_path.is_symlink() or not file_path.is_file():
+                    if _is_symlink_or_junction(file_path) or not file_path.is_file():
                         continue
                     relative = file_path.relative_to(skill_dir).as_posix()
                     try:
@@ -920,7 +953,26 @@ def _agent_instruction_map(root: Path) -> tuple[list[dict[str, Any]], bool]:
         return [], True
     tracked = {p for p in tracked_result.stdout.split("\0") if p} if tracked_result.returncode == 0 else set()
     others = {p for p in others_result.stdout.split("\0") if p} if others_result.returncode == 0 else set()
-    candidates = {p for p in tracked | others if _is_agent_instruction(p)}
+    # Git-ignored instruction files are still loaded by the hosts (ignoring CLAUDE.local.md is
+    # the documented recommendation), so they must not hide from the map. The pathspecs bound
+    # the listing to instruction basenames - a bare --ignored listing would return node_modules.
+    try:
+        ignored_result = _git(
+            root, "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--",
+            ":(icase)*agents.md", ":(icase)*claude.md", ":(icase)*claude.local.md", ":(icase)*agents.project-context.md",
+            # Dependencies increasingly ship their own CLAUDE.md/AGENTS.md; vendor trees are a
+            # listing bound here (they would evict repo-local entries from the 200 cap), not an
+            # audit-scope decision.
+            ":(exclude)node_modules/", ":(exclude)vendor/", ":(exclude)third_party/",
+        )
+    except ContractError:
+        ignored_result = None
+    ignored = (
+        {p for p in ignored_result.stdout.split("\0") if p}
+        if ignored_result is not None and ignored_result.returncode == 0
+        else set()
+    )
+    candidates = {p for p in tracked | others | ignored if _is_agent_instruction(p)}
     # Root host files by exact directory listing, so a git-ignored CLAUDE.md is still seen.
     try:
         candidates.update(name for name in os.listdir(root) if name.lower() in _INSTRUCTION_BASENAMES)
@@ -928,21 +980,33 @@ def _agent_instruction_map(root: Path) -> tuple[list[dict[str, Any]], bool]:
         pass
     for extra in (".claude", ".agents", ".codex", ".cursor", ".github"):
         base = root / extra
-        if base.is_dir() and not base.is_symlink():
+        if base.is_dir() and not _is_symlink_or_junction(base):
             for directory, dirnames, filenames in os.walk(base, followlinks=False):
-                dirnames[:] = [d for d in dirnames if not (Path(directory) / d).is_symlink()]
+                dirnames[:] = [d for d in dirnames if not _is_symlink_or_junction(Path(directory) / d)]
                 for name in filenames:
                     file_path = Path(directory) / name
-                    if file_path.is_symlink():
+                    if _is_symlink_or_junction(file_path):
                         continue
                     relative = file_path.relative_to(root).as_posix()
                     if _is_agent_instruction(relative):
                         candidates.add(relative)
+    # The discovery listing above is bounded to basenames; the flag must be accurate for
+    # every candidate (a git-ignored .claude/settings.local.json arrives via the host walk).
+    untracked_candidates = sorted(candidates - tracked)
+    if untracked_candidates:
+        try:
+            check_result = _git(
+                root, "-c", "core.excludesfile=", "check-ignore", "-z", "--", *untracked_candidates
+            )
+            if check_result.returncode in (0, 1):
+                ignored = {p for p in check_result.stdout.split("\0") if p}
+        except ContractError:
+            pass
     entries: list[dict[str, Any]] = []
     truncated = False
     for relative in sorted(candidates):
         path = root / relative
-        if not path.is_file() or path.is_symlink():
+        if not path.is_file() or _is_symlink_or_junction(path):
             continue
         try:
             raw = _read_regular(path, relative)
@@ -953,6 +1017,7 @@ def _agent_instruction_map(root: Path) -> tuple[list[dict[str, Any]], bool]:
             {
                 "path": relative,
                 "tracked": relative in tracked,
+                "ignored": relative in ignored,
                 "size": len(raw),
                 "sha256": _skill_directory_digest(root, relative) or sha256_bytes(raw),
                 "modified": modified,
@@ -1034,6 +1099,9 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         raise ContractError("Git returned an invalid repository root") from exc
     if git_root != root:
         raise ContractError(f"preflight path is not the exact Git root: {git_root}")
+    # Host-file and fixed-path problems are reported structurally, never as a crash: the
+    # dashboard (which starts from this preflight) must be able to SHOW the invalid state.
+    host_errors: list[dict[str, str]] = []
     for relative in (
         "repodocs",
         CONFIG_PATH,
@@ -1051,18 +1119,36 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     ):
         path = root / relative
         if os.path.lexists(path):
-            safe_path(root, relative, must_exist=True)
+            try:
+                safe_path(root, relative, must_exist=True)
+            except ContractError as exc:
+                host_errors.append({"path": relative, "error": str(exc).replace(str(root), "<repo>")})
     repodocs = root / "repodocs"
     if repodocs.exists():
         if not repodocs.is_dir():
-            raise ContractError("repodocs must be a directory")
-        for directory, names, files in os.walk(repodocs, followlinks=False):
-            if any((Path(directory) / name).is_symlink() for name in [*names, *files]):
-                raise ContractError("symlinks are not allowed anywhere under repodocs")
+            host_errors.append({"path": "repodocs", "error": "repodocs must be a directory"})
+        else:
+            for directory, names, files in os.walk(repodocs, followlinks=False):
+                offender = next(
+                    (name for name in [*names, *files] if _is_symlink_or_junction(Path(directory) / name)), None
+                )
+                if offender is not None:
+                    host_errors.append(
+                        {
+                            "path": (Path(directory) / offender).relative_to(root).as_posix(),
+                            "error": "symlinks are not allowed anywhere under repodocs",
+                        }
+                    )
+                    break
     for host, relative in HOST_FILES.items():
         path = root / relative
+        if any(entry["path"] == relative for entry in host_errors):
+            continue  # already reported by the fixed-path check; one row per path
         if path.is_file():
-            extract_host_block(_decode_text(_read_regular(path, relative), relative), host)
+            try:
+                extract_host_block(_decode_text(_read_regular(path, relative), relative), host)
+            except ContractError as exc:
+                host_errors.append({"path": relative, "error": str(exc).replace(str(root), "<repo>")})
     legacy = [
         relative
         for relative in (
@@ -1086,6 +1172,9 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     if revision is not None and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", revision):
         raise ContractError("Git returned an invalid revision")
     context_state, context_error = _context_state(root)
+    if host_errors and context_state == "valid":
+        context_state = "invalid"
+        context_error = f"{host_errors[0]['path']}: {host_errors[0]['error']}"
     evidence = _source_evidence(root)
     worktree_clean = _source_worktree_clean(root)
     exclusions: list[str] = []
@@ -1110,6 +1199,7 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         "worktree_clean": worktree_clean,
         "context_state": context_state,
         "context_error": context_error,
+        "host_errors": host_errors,
         "source_state": "codebase" if evidence else "greenfield",
         "source_evidence": evidence,
         "canonical_config": CONFIG_PATH,
@@ -1194,8 +1284,30 @@ def _validated_project(repo: Path) -> dict[str, Any]:
     config = validate_config(strict_json_loads(_decode_text(config_raw, CONFIG_PATH), CONFIG_PATH))
     manifest = validate_manifest(strict_json_loads(_decode_text(manifest_raw, MANIFEST_PATH), MANIFEST_PATH))
     skill_version = (Path(__file__).resolve().parents[1] / "VERSION").read_text(encoding="utf-8").strip()
+    warnings: list[str] = []
     if manifest["skill_version"] != skill_version:
-        raise ContractError("manifest skill_version does not match the installed skill")
+        # Contract compatibility is carried by (major, minor); a patch delta is a visible
+        # warning, not invalidity - otherwise every docs-only release forces a full re-audit.
+        if manifest["skill_version"].split(".")[:2] != skill_version.split(".")[:2]:
+            raise ContractError(
+                f"context was generated by skill {manifest['skill_version']} but {skill_version} is installed; "
+                "the contract versions differ - re-run the audit to regenerate "
+                "(see CHANGELOG.md for what changed and references/upgrade.md for the flow)"
+            )
+        try:
+            manifest_newer = int(manifest["skill_version"].split(".")[2]) > int(skill_version.split(".")[2])
+        except (IndexError, ValueError):
+            manifest_newer = False
+        if manifest_newer:
+            warnings.append(
+                f"context was generated by skill {manifest['skill_version']}, newer than the installed "
+                f"{skill_version} by a compatible patch - update the skill to match"
+            )
+        else:
+            warnings.append(
+                f"context was generated by skill {manifest['skill_version']}; installed {skill_version} is a "
+                "compatible patch release - re-audit to refresh when convenient"
+            )
     if manifest["config_sha256"] != sha256_text(_decode_text(config_raw, CONFIG_PATH)):
         raise ContractError("manifest config_sha256 does not match normalized config text")
     enabled_hosts = sorted(name for name, enabled in config["hosts"].items() if enabled)
@@ -1432,12 +1544,27 @@ def _validated_project(repo: Path) -> dict[str, Any]:
                 target_text = markdown.get(target_path, "")
                 if f'<a id="{fragment}"></a>' not in target_text:
                     raise ContractError(f"{relative} has unresolved wikilink anchor: {target}#{fragment}")
+    # The dashboard machine-reads the "## ADR-NNN:" / "## MB-NNN:" heading shape; an anchor
+    # without its heading renders that decision or backlog item invisible in the views.
+    for governance_path, prefix in (("repodocs/decisions.md", "ADR"), ("repodocs/migration-backlog.md", "MB")):
+        # Code spans stay quotable (SKILL.md's documented escape), and the heading regex
+        # accepts exactly what _markdown_sections accepts, so the tripwire never fires on
+        # content the dashboard actually renders.
+        governance_text = strip_code_spans(markdown.get(governance_path, ""))
+        headings = set(re.findall(rf"^##\s+({prefix}-[0-9]{{3,}})\s*(?::|$)", governance_text, flags=re.MULTILINE))
+        for anchor in re.findall(rf'<a id="({prefix}-[0-9]{{3,}})"></a>', governance_text):
+            if anchor not in headings:
+                raise ContractError(
+                    f"{governance_path} anchor {anchor} has no matching '## {anchor}: ...' heading "
+                    "(the dashboard reads that literal heading shape, in any language)"
+                )
     summary = {
         "status": "valid",
         "artifacts": len(manifest["artifacts"]),
         "hosts": manifest["hosts"],
         "domains": manifest["domains"],
         "wikilinks": wikilinks,
+        "warnings": warnings,
     }
     return {
         "root": root,
@@ -1575,7 +1702,10 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
             "artifacts": 0,
             "wikilinks": 0,
             "checks": [],
-            "limitations": ["Structural validation does not prove factual completeness."],
+            "limitations": [
+                "Structural validation does not prove factual completeness.",
+                *(f"{entry['path']}: {entry['error']}" for entry in current["host_errors"]),
+            ],
         },
     }
     if current["context_state"] != "valid":
@@ -1632,6 +1762,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
             "layout": config["document_layout"],
             "hosts": manifest["hosts"],
             "domains": manifest["domains"],
+            "warnings": project["summary"].get("warnings", []),
         }
     )
     model["audit"] = {"latest": latest, "history": list(reversed(project["inventory"]["runs"]))}
@@ -1849,6 +1980,8 @@ def self_check(skill_root: Path) -> dict[str, Any]:
     required = {
         "SKILL.md",
         "README.md",
+        "CHANGELOG.md",
+        "RELEASING.md",
         "LICENSE",
         "VERSION",
         "agents/openai.yaml",
@@ -1857,6 +1990,8 @@ def self_check(skill_root: Path) -> dict[str, Any]:
         "assets/project-context-logo.svg",
         "scripts/project_context.py",
         "evals/cases.json",
+        "evals/fixtures/build.sh",
+        "evals/scorecard.template.json",
         "schemas/findings.schema.json",
         "schemas/project-map.schema.json",
         "examples/PROJECT_CONTEXT.md",
@@ -1895,6 +2030,15 @@ def self_check(skill_root: Path) -> dict[str, Any]:
     if manifest["skill_version"] != version:
         raise ContractError("template manifest skill_version does not match VERSION")
     validate_inventory(load_json(root / "examples/inventory.json"))
+    scorecard = _mapping(load_json(root / "evals/scorecard.template.json"), "evals scorecard template")
+    _exact_keys(scorecard, {"schema_version", "skill_version", "runs"}, "evals scorecard template")
+    for index, raw in enumerate(_list(scorecard["runs"], "evals scorecard template runs")):
+        run_entry = _mapping(raw, f"evals scorecard template runs[{index}]")
+        _exact_keys(
+            run_entry,
+            {"case_id", "run_at", "passed", "expected_met", "expected_missed", "forbidden_hit", "notes"},
+            f"evals scorecard template runs[{index}]",
+        )
     cases = _mapping(load_json(root / "evals/cases.json"), "evals")
     _exact_keys(cases, {"schema_version", "cases"}, "evals")
     if type(cases["schema_version"]) is not int or cases["schema_version"] != 1:
@@ -1938,6 +2082,7 @@ def build_parser() -> argparse.ArgumentParser:
     command = commands.add_parser("validate-findings")
     command.add_argument("--input", required=True, type=Path)
     command.add_argument("--previous", type=Path)
+    command.add_argument("--previous-sha256", help="expected sha256:<hex> of the previous file's normalized text, from the last valid manifest")
     command.add_argument("--allow-provisional", action="store_true")
     command = commands.add_parser("validate-inventory")
     command.add_argument("--input", required=True, type=Path)
@@ -1980,6 +2125,23 @@ def main(argv: list[str] | None = None) -> int:
             validate_config(load_json(args.input))
             dump({"status": "valid"})
         elif args.command == "validate-findings":
+            if args.previous_sha256 and not args.previous:
+                raise ContractError("--previous-sha256 requires --previous")
+            if args.previous and args.previous_sha256:
+                if not HASH_RE.fullmatch(args.previous_sha256):
+                    raise ContractError("--previous-sha256 is not a valid sha256:<hex> value")
+                try:
+                    previous_raw = args.previous.read_bytes()
+                except OSError as exc:
+                    raise ContractError(f"cannot read --previous file {args.previous}: {exc.strerror or exc}") from exc
+                # The manifest hashes normalized text (BOM stripped, line endings unified),
+                # so the guard must too - otherwise a CRLF checkout rejects genuine history.
+                if sha256_text(_decode_text(previous_raw, str(args.previous))) != args.previous_sha256:
+                    raise ContractError(
+                        "previous findings file does not match the recorded manifest hash (unknown provenance): "
+                        "do not inherit its ids or refuted history - start a fresh series and record the "
+                        "discontinuity in the drift report"
+                    )
             current = validate_findings(
                 load_json(args.input),
                 load_json(args.previous) if args.previous else None,

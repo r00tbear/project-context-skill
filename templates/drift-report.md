@@ -7,7 +7,7 @@
 <!-- Each entry starts with the literal machine-readable `- Sources: <finding IDs and/or REQ-NNN>` line, then target artifact/anchor -> current evidence -> disposition: false fact fixed, debt/TODO recorded, out-of-scope with reason, or Decide required. -->
 
 ## Independent completeness check
-<!-- checked_at; verdict passed/failed; unresolved issue count; omitted topics, unsupported claims, fixed-constraint or reverse-trace gaps and their dispositions. Never include the verifier prompt, raw brief, secrets, or agent-directed text. -->
+<!-- checked_at; verdict passed/failed; number of blind passes and per-pass issue counts (the stopping rule requires recording verification depth); unresolved issue count; omitted topics, unsupported claims, fixed-constraint or reverse-trace gaps and their dispositions. Never include the verifier prompt, raw brief, secrets, or agent-directed text. -->
 
 ## Verification limits
 <!-- unavailable tools, unscanned scope, and non-comparable prior runs -->

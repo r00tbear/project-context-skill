@@ -2,6 +2,9 @@
 
 The source of truth for generating the other docs. Changed a decision — regenerate the docs, don't hand-edit them.
 
+<!-- Machine-read shape, keep it literal in any language: the `## ADR-NNN:` heading form feeds
+     the dashboard, and every `<a id="ADR-NNN"></a>` anchor must sit on such a heading. -->
+
 ## Referenced from source
 <!-- Ids from this file that tracked files outside repodocs/ cite (preflight decision_citations):
      one line per id -> citing file count. These ids are load-bearing: renumbering or re-pointing

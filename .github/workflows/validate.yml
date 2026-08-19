@@ -17,6 +17,10 @@ jobs:
           - {os: ubuntu-latest, python: "3.11"}
           - {os: ubuntu-latest, python: "3.14"}
           - {os: macos-latest, python: "3.13"}
+          - {os: windows-latest, python: "3.12"}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,24 +48,36 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Run install.sh against this checkout
+      - name: Run install.sh against this checkout (cross-version update path)
         if: runner.os != 'Windows'
         run: |
           export PROJECT_CONTEXT_HOME="$RUNNER_TEMP/pc-home"
           export PROJECT_CONTEXT_REPO="$PWD"
           export PROJECT_CONTEXT_NO_JCODEMUNCH=1 # hermetic: no PyPI dependency in CI
-          bash install.sh
-          bash install.sh # second run must take the update path
-          test -f "$PROJECT_CONTEXT_HOME/.agents/skills/project-context/VERSION"
+          # Pre-seed a fake legacy full copy so the archive branch actually executes.
+          mkdir -p "$PROJECT_CONTEXT_HOME/.claude/skills/project-context/auditors"
+          echo legacy > "$PROJECT_CONTEXT_HOME/.claude/skills/project-context/SKILL.md"
+          PROJECT_CONTEXT_VERSION=v0.4.0 bash install.sh
+          grep -qx "0.4.0" "$PROJECT_CONTEXT_HOME/.agents/skills/project-context/VERSION"
+          bash install.sh # unpinned second run must perform a real version change
+          test "$(cat "$PROJECT_CONTEXT_HOME/.agents/skills/project-context/VERSION")" != "0.4.0"
           test -f "$PROJECT_CONTEXT_HOME/.claude/skills/project-context/SKILL.md"
-      - name: Run install.ps1 against this checkout
+          ls "$PROJECT_CONTEXT_HOME/.skill-backups" | grep -q claude-project-context
+      - name: Run install.ps1 against this checkout (cross-version update path)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $env:PROJECT_CONTEXT_HOME = Join-Path $env:RUNNER_TEMP "pc-home"
           $env:PROJECT_CONTEXT_REPO = "$PWD"
           $env:PROJECT_CONTEXT_NO_JCODEMUNCH = "1" # hermetic: no PyPI dependency in CI
+          # Pre-seed a fake legacy full copy so the archive branch actually executes.
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\auditors") | Out-Null
+          Set-Content (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\SKILL.md") "legacy"
+          $env:PROJECT_CONTEXT_VERSION = "v0.4.0"
           ./install.ps1
-          ./install.ps1 # second run must take the update path
-          if (-not (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION"))) { exit 1 }
+          if ((Get-Content (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION")).Trim() -ne "0.4.0") { exit 1 }
+          Remove-Item Env:PROJECT_CONTEXT_VERSION
+          ./install.ps1 # unpinned second run must perform a real version change
+          if ((Get-Content (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION")).Trim() -eq "0.4.0") { exit 1 }
           if (-not (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\SKILL.md"))) { exit 1 }
+          if (-not (Get-ChildItem (Join-Path $env:PROJECT_CONTEXT_HOME ".skill-backups") | Where-Object Name -like "claude-project-context*")) { exit 1 }

@@ -34,6 +34,18 @@ from scripts.project_context import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _symlinks_supported() -> bool:
+    try:
+        with tempfile.TemporaryDirectory() as probe:
+            os.symlink(os.path.join(probe, "target"), os.path.join(probe, "link"))
+        return True
+    except (OSError, NotImplementedError, AttributeError):
+        return False
+
+
+requires_symlinks = unittest.skipUnless(_symlinks_supported(), "symlink creation is unavailable on this platform")
 SCRIPT = ROOT / "scripts/project_context.py"
 SKILL_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 RUN_ID = "run-20260802-1"
@@ -148,6 +160,20 @@ class PathTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ContractError):
                 validate_relative_path(value)
 
+    @unittest.skipUnless(os.name == "nt", "NTFS junctions exist only on Windows")
+    def test_safe_path_rejects_ntfs_junction(self) -> None:
+        import _winapi
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            target = base / "real"
+            target.mkdir()
+            repo = base / "repo"
+            repo.mkdir()
+            _winapi.CreateJunction(str(target), str(repo / "junction"))
+            with self.assertRaisesRegex(ContractError, "symlink is not allowed"):
+                safe_path(repo, "junction/file.md")
+
+    @requires_symlinks
     def test_safe_path_rejects_symlink_components(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -678,6 +704,7 @@ class ProjectValidationTests(unittest.TestCase):
             with self.assertRaisesRegex(ContractError, "malformed wikilinks"):
                 validate_project(root)
 
+    @requires_symlinks
     def test_detects_symlink_artifact_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -925,8 +952,14 @@ class ProjectValidationTests(unittest.TestCase):
             manifest_path = root / "repodocs/project-context.manifest.json"
             manifest["skill_version"] = "0.1.0"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "installed skill"):
+            with self.assertRaisesRegex(ContractError, "contract versions differ"):
                 validate_project(root)
+            major, minor, patch = SKILL_VERSION.split(".")
+            manifest["skill_version"] = f"{major}.{minor}.{int(patch) + 1}"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            summary = validate_project(root)  # a patch delta warns, never invalidates
+            self.assertEqual("valid", summary["status"])
+            self.assertTrue(any("compatible patch" in warning for warning in summary["warnings"]))
             manifest["skill_version"] = SKILL_VERSION
             inventory_path = root / "repodocs/audit/inventory.json"
             inventory_value = strict_json_loads(inventory_path.read_text())
@@ -1025,6 +1058,7 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             (root / "repodocs/architecture.md").write_text("drifted\n", encoding="utf-8")
             self.assertEqual("codebase", preflight(root)["source_state"])
 
+    @requires_symlinks
     def test_preflight_counts_nonignored_symlink_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1039,6 +1073,7 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             finally:
                 outside.rmdir()
 
+    @requires_symlinks
     def test_preflight_does_not_follow_symlinked_readme(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1053,6 +1088,7 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             finally:
                 outside.unlink()
 
+    @requires_symlinks
     def test_preflight_rejects_symlink_under_repodocs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1062,10 +1098,25 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             outside.write_text("", encoding="utf-8")
             try:
                 (root / "repodocs/linked.md").symlink_to(outside)
-                with self.assertRaisesRegex(ContractError, "symlinks are not allowed"):
-                    preflight(root)
+                result = preflight(root)  # reported structurally, never a crash
+                self.assertTrue(
+                    any("symlinks are not allowed" in entry["error"] for entry in result["host_errors"])
+                )
             finally:
                 outside.unlink()
+
+    @requires_symlinks
+    def test_preflight_reports_broken_host_file_structurally(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "AGENTS.md").write_text("shared instructions\n", encoding="utf-8")
+            (root / "CLAUDE.md").symlink_to(root / "AGENTS.md")
+            result = preflight(root)  # symlinked host files are widespread practice
+            self.assertTrue(any(entry["path"] == "CLAUDE.md" for entry in result["host_errors"]))
+            self.assertIn(result["context_state"], {"absent", "invalid"})
+            snapshot = dashboard_snapshot(root)  # and the dashboard must still start
+            self.assertIn(snapshot["context"]["state"], {"absent", "invalid"})
 
     def test_preflight_reports_v01_legacy_surfaces(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1143,6 +1194,41 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             self.assertIn(".agents/skills/demo/SKILL.md", entries)
             self.assertNotIn(".agents/skills/demo/reference/deep.md", entries)
             self.assertIn("modified", entries["AGENTS.md"])
+
+    def test_instruction_map_sees_git_ignored_instruction_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "apps/web").mkdir(parents=True)
+            (root / "apps/web/CLAUDE.md").write_text("nested, ignored, still loaded by the host\n", encoding="utf-8")
+            (root / ".gitignore").write_text("apps/*/CLAUDE.md\n", encoding="utf-8")
+            entries = {entry["path"]: entry for entry in preflight(root)["agent_instructions"]}
+            self.assertIn("apps/web/CLAUDE.md", entries)
+            self.assertTrue(entries["apps/web/CLAUDE.md"]["ignored"])
+            self.assertFalse(entries["apps/web/CLAUDE.md"]["tracked"])
+
+    def test_governance_anchor_requires_matching_heading(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self._project_with_decisions(root, '# decisions\n\n<a id="ADR-001"></a>\n## Решение ADR-001\n')
+            with self.assertRaisesRegex(ContractError, "no matching '## ADR-001:"):
+                validate_project(root)
+            self._project_with_decisions(root, '# decisions\n\n<a id="ADR-001"></a>\n## ADR-001: Решение\n', fresh=False)
+            self.assertEqual("valid", validate_project(root)["status"])
+
+    @staticmethod
+    def _project_with_decisions(root: Path, decisions_text: str, fresh: bool = True) -> dict[str, Any]:
+        if fresh:
+            manifest = ProjectValidationTests._write_project(root)
+        decisions_path = root / "repodocs/decisions.md"
+        decisions_path.write_text(decisions_text, encoding="utf-8")
+        manifest_path = root / "repodocs/project-context.manifest.json"
+        manifest = strict_json_loads(manifest_path.read_text())
+        for artifact in manifest["artifacts"]:
+            if artifact["path"] == "repodocs/decisions.md":
+                artifact["sha256"] = sha256_text(decisions_text)
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
 
     def test_skill_directory_digest_sees_reference_divergence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1695,6 +1781,7 @@ class CliTests(unittest.TestCase):
                 json.loads(result.stdout),
             )
 
+    @unittest.skipIf(os.name == "nt", "install.sh test is POSIX-only; install.ps1 is covered by the CI installer job")
     def test_installer_installs_updates_and_archives_legacy(self) -> None:
         tags = subprocess.run(["git", "-C", str(ROOT), "tag", "-l", "v*"], capture_output=True, text=True)
         if not tags.stdout.strip():
@@ -1734,6 +1821,22 @@ class CliTests(unittest.TestCase):
             calls = (fake_bin / "calls.log").read_text(encoding="utf-8")
             self.assertIn("--version", calls)
             self.assertIn("init --client auto --yes", calls)
+
+    def test_previous_sha256_guards_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            previous = Path(temporary) / "previous.json"
+            previous.write_text(json.dumps(finding_document()), encoding="utf-8")
+            current = Path(temporary) / "current.json"
+            document = finding_document()
+            document["findings"][0]["status"] = "persisting"
+            current.write_text(json.dumps(document), encoding="utf-8")
+            good = sha256_bytes(previous.read_bytes())
+            result = self._run("validate-findings", "--input", str(current), "--previous", str(previous), "--previous-sha256", good)
+            self.assertEqual(0, result.returncode, result.stderr.decode())
+            bad = "sha256:" + "0" * 64
+            result = self._run("validate-findings", "--input", str(current), "--previous", str(previous), "--previous-sha256", bad)
+            self.assertEqual(4, result.returncode)
+            self.assertIn("unknown provenance", json.loads(result.stderr)["error"])
 
     def test_missing_repo_is_user_correctable(self) -> None:
         result = self._run("preflight", "--repo", "/nonexistent/project-context-missing")

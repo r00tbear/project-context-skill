@@ -158,7 +158,7 @@ One canonical payload, one canonical context. The skill never creates lowercase 
 <details>
 <summary><b>Upgrading across major versions</b></summary>
 
-Releases are immutable tags. Re-running the installer (or asking your agent to update) moves you to the latest release. Major versions are fresh-install-only for the *generated* files: after upgrading the skill, an old project reports its context as invalid — that is the signal to re-run the audit, which regenerates everything and re-asks only what changed. Your accepted decisions are carried into the new interview, not thrown away. Details: [references/upgrade.md](references/upgrade.md).
+Releases are immutable tags; [CHANGELOG.md](CHANGELOG.md) states per release whether generated context must be re-applied. Re-running the installer (or asking your agent to update) moves you to the latest release. A patch release only warns; a minor/major release makes an old project report its context as invalid — that is the signal to re-run the audit, which regenerates everything and re-asks only what changed. Your accepted decisions are carried into the new interview, not thrown away. Details: [references/upgrade.md](references/upgrade.md).
 
 </details>
 
@@ -172,7 +172,7 @@ python3 scripts/project_context.py self-check --skill-root .
 python3 -m unittest discover -s tests -v
 ```
 
-Layout: `SKILL.md` is the entry point; `auditors/` are the subagent prompts; `references/` hold the deep workflow contracts; `templates/` and `examples/` shape the generated output; `scripts/project_context.py` is a stdlib-only validator and dashboard server; `evals/cases.json` describes expected behavior.
+Layout: `SKILL.md` is the entry point; `auditors/` are the subagent prompts; `references/` hold the deep workflow contracts; `templates/` and `examples/` shape the generated output; `scripts/project_context.py` is a stdlib-only validator and dashboard server; `evals/` describes expected behavior with an executable subset. Releases follow [RELEASING.md](RELEASING.md).
 
 </details>
 

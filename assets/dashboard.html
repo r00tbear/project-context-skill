@@ -2153,6 +2153,7 @@
         if (unscanned.length) systemAttention.push({kind: "integrity", runLevel: true, id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});
         if (blind === "failed") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification failed", detail: `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`, href: "#integrity"});
         if (blind === "not-run") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification was not run", detail: "Factual completeness was not independently checked for this run.", href: "#integrity"});
+        asArray(context.warnings).forEach((warning) => systemAttention.push({kind: "integrity", runLevel: true, id: "VERSION", title: "Skill and context versions differ by a patch release", detail: asText(warning), href: "#integrity"}));
         const urgentFindings = active.filter((finding) => ["critical", "high"].includes(currentSeverity(finding))).sort(compareFindings);
         const attention = [...systemAttention, ...urgentFindings.slice(0, 5).map((finding) => ({kind: "finding", finding}))];
         const totalAttention = systemAttention.length + urgentFindings.length;
@@ -3502,7 +3503,7 @@
           const summary = make("summary");
           summary.append(make("span", "document-entry-title", asText(entry.path)));
           const flags = [
-            entry.tracked ? "tracked" : "local-only",
+            entry.tracked ? "tracked" : entry.ignored ? "local-only (git-ignored)" : "local-only",
             asArray(entry.hosts).join("/"),
             `${asCount(entry.size)} bytes`,
             asText(entry.modified) ? `modified ${formatDate(entry.modified)}` : ""
