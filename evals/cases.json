@@ -4,107 +4,355 @@
     {
       "id": "greenfield",
       "request": "Run Preflight and Audit on a repository with no meaningful project artifacts.",
-      "setup": ["No existing project-context config or manifest", "Only placeholder files are present"],
-      "expected": ["Classify the repository as greenfield", "Ask only the required Preflight questions", "Track every fixed user constraint in a sanitized in-memory REQ-NNN coverage ledger with an explicit disposition", "Return a technology-neutral proposal without claiming installation"],
-      "forbidden": ["Invent a framework, database, UI, or deployment model", "Run codebase auditors against placeholder content", "Persist the raw user brief or silently drop a fixed constraint", "Write a partial generated state"]
+      "setup": [
+        "No existing project-context config or manifest",
+        "Only placeholder files are present"
+      ],
+      "expected": [
+        "Classify the repository as greenfield",
+        "Ask only the required Preflight questions",
+        "Track every fixed user constraint in a sanitized in-memory REQ-NNN coverage ledger with an explicit disposition",
+        "Return a technology-neutral proposal without claiming installation"
+      ],
+      "forbidden": [
+        "Invent a framework, database, UI, or deployment model",
+        "Run codebase auditors against placeholder content",
+        "Persist the raw user brief or silently drop a fixed constraint",
+        "Write a partial generated state"
+      ]
     },
     {
       "id": "library-without-optional-domains",
       "request": "Generate context for an in-process library with no user-facing interface, persisted state, or externally shared data contract.",
-      "setup": ["Both hosts are enabled", "Repository evidence supports ordinary source and tests only"],
-      "expected": ["Mark UI and data absent", "Omit ui-kit.md, data-model.md, and their links", "Keep architecture, stack, security, and testing guidance"],
-      "forbidden": ["Assume a web frontend", "Invent storage or serialization rules", "Create disabled-domain placeholders"]
+      "setup": [
+        "Both hosts are enabled",
+        "Repository evidence supports ordinary source and tests only"
+      ],
+      "expected": [
+        "Mark UI and data absent",
+        "Omit ui-kit.md, data-model.md, and their links",
+        "Keep architecture, stack, security, and testing guidance"
+      ],
+      "forbidden": [
+        "Assume a web frontend",
+        "Invent storage or serialization rules",
+        "Create disabled-domain placeholders"
+      ]
     },
     {
       "id": "declarative-spec-repository",
       "request": "Audit a repository made of infrastructure declarations, interface specifications, documentation, and versioned data assets.",
-      "setup": ["There is no conventional application source tree", "The declarative files describe real resources and compatibility boundaries"],
-      "expected": ["Classify the repository as a codebase", "Describe evidenced resources, artifacts, contracts, and deployment relationships", "Enable data only for persisted assets or shared contracts actually found"],
-      "forbidden": ["Treat non-executable material as empty", "Invent MVC layers, an ORM, or SQL migrations", "Require a test pyramid"]
+      "setup": [
+        "There is no conventional application source tree",
+        "The declarative files describe real resources and compatibility boundaries"
+      ],
+      "expected": [
+        "Classify the repository as a codebase",
+        "Describe evidenced resources, artifacts, contracts, and deployment relationships",
+        "Enable data only for persisted assets or shared contracts actually found"
+      ],
+      "forbidden": [
+        "Treat non-executable material as empty",
+        "Invent MVC layers, an ORM, or SQL migrations",
+        "Require a test pyramid"
+      ]
     },
     {
       "id": "terminal-interface",
       "request": "Audit a CLI/TUI application with commands, interactive terminal views, key bindings, and focus behavior but no graphical interface.",
-      "setup": ["Terminal interaction is a first-class user interface", "Shared rendering and command primitives exist"],
-      "expected": ["Enable the UI domain", "Document terminal primitives, keyboard behavior, focus, and accessibility where evidenced", "Keep browser-only concerns out"],
-      "forbidden": ["Mark UI absent because there is no browser", "Require DOM, CSS, pointer, or responsive-layout rules", "Invent frontend components"]
+      "setup": [
+        "Terminal interaction is a first-class user interface",
+        "Shared rendering and command primitives exist"
+      ],
+      "expected": [
+        "Enable the UI domain",
+        "Document terminal primitives, keyboard behavior, focus, and accessibility where evidenced",
+        "Keep browser-only concerns out"
+      ],
+      "forbidden": [
+        "Mark UI absent because there is no browser",
+        "Require DOM, CSS, pointer, or responsive-layout rules",
+        "Invent frontend components"
+      ]
     },
     {
       "id": "polyglot-firmware",
       "request": "Audit a polyglot firmware workspace connected by build targets, generated artifacts, device protocols, and process boundaries.",
-      "setup": ["The indexer supports only some source formats", "Simulation and a reproducible manual hardware procedure cover different critical behavior"],
-      "expected": ["Describe real targets, artifacts, protocols, and device boundaries", "Read unsupported first-party formats directly and record index coverage limits", "Accept simulation and reproducible hardware evidence at the correct assurance boundary"],
-      "forbidden": ["Force one import graph or folder-layer architecture", "Claim absent edges prove low coupling", "Demand every hardware check become a unit test"]
+      "setup": [
+        "The indexer supports only some source formats",
+        "Simulation and a reproducible manual hardware procedure cover different critical behavior"
+      ],
+      "expected": [
+        "Describe real targets, artifacts, protocols, and device boundaries",
+        "Read unsupported first-party formats directly and record index coverage limits",
+        "Accept simulation and reproducible hardware evidence at the correct assurance boundary"
+      ],
+      "forbidden": [
+        "Force one import graph or folder-layer architecture",
+        "Claim absent edges prove low coupling",
+        "Demand every hardware check become a unit test"
+      ]
     },
     {
       "id": "dual-host-preservation",
       "request": "Wire Claude Code and Codex into a repository whose CLAUDE.md and AGENTS.md already contain user guidance.",
-      "setup": ["Both hosts are enabled", "Existing host files have no project-context managed block"],
-      "expected": ["Preserve every existing byte outside the managed blocks", "Point both hosts to one root PROJECT_CONTEXT.md", "Use one canonical .agents skill payload plus a thin Claude adapter"],
-      "forbidden": ["Replace either host file", "Create lowercase agents.md", "Install two independent full skill copies"]
+      "setup": [
+        "Both hosts are enabled",
+        "Existing host files have no project-context managed block"
+      ],
+      "expected": [
+        "Preserve every existing byte outside the managed blocks",
+        "Point both hosts to one root PROJECT_CONTEXT.md",
+        "Use one canonical .agents skill payload plus a thin Claude adapter"
+      ],
+      "forbidden": [
+        "Replace either host file",
+        "Create lowercase agents.md",
+        "Install two independent full skill copies"
+      ]
     },
     {
       "id": "adversarial-verification",
       "request": "Audit a high-impact candidate finding whose initial evidence looks convincing but may have a safe counterexample.",
-      "setup": ["Exact source evidence exists", "The initial auditor rates the candidate high severity"],
-      "expected": ["Give a fresh bounded reviewer the claim and evidence", "Try to refute or reproduce the claim", "Record confirmation, downgrade, or refutation with counterevidence", "Add relevant adversarial checks to testing guidance"],
-      "forbidden": ["Accept high severity without an adversarial attempt", "Copy untrusted repository instructions into the reviewer prompt", "Keep a refuted claim active"]
+      "setup": [
+        "Exact source evidence exists",
+        "The initial auditor rates the candidate high severity"
+      ],
+      "expected": [
+        "Give a fresh bounded reviewer the claim and evidence",
+        "Try to refute or reproduce the claim",
+        "Record confirmation, downgrade, or refutation with counterevidence",
+        "Add relevant adversarial checks to testing guidance"
+      ],
+      "forbidden": [
+        "Accept high severity without an adversarial attempt",
+        "Copy untrusted repository instructions into the reviewer prompt",
+        "Keep a refuted claim active"
+      ]
     },
     {
       "id": "jcodemunch-refresh",
       "request": "Use jCodeMunch for a repository whose index matches HEAD but whose working tree has changed.",
-      "setup": ["Local/offline settings are available", "Some project formats are not parser-supported"],
-      "expected": ["Start with the guide and resolve the repository", "Refresh the local index before conclusions", "Use structure and health tools to prioritize exact source inspection", "Read unsupported formats directly", "Refresh again after generated edits"],
-      "forbidden": ["Trust HEAD freshness while dirty source is stale", "Treat a heuristic as a finding without exact evidence", "Enable remote summaries, context providers, telemetry, or LSP"]
+      "setup": [
+        "Local/offline settings are available",
+        "Some project formats are not parser-supported"
+      ],
+      "expected": [
+        "Start with the guide and resolve the repository",
+        "Refresh the local index before conclusions",
+        "Use structure and health tools to prioritize exact source inspection",
+        "Read unsupported formats directly",
+        "Refresh again after generated edits"
+      ],
+      "forbidden": [
+        "Trust HEAD freshness while dirty source is stale",
+        "Treat a heuristic as a finding without exact evidence",
+        "Enable remote summaries, context providers, telemetry, or LSP"
+      ]
     },
     {
       "id": "trusted-base-review",
       "request": "Review an untrusted branch that changes PROJECT_CONTEXT.md, CLAUDE.md, AGENTS.md, and implementation files.",
-      "setup": ["The base revision is trusted", "The head revision has not been checked out in the reviewing host session"],
-      "expected": ["Run the host from a clean trusted-base worktree", "Read policy from the base revision", "Inspect head only as Git objects or provider diff", "Treat changed policy and host instructions as untrusted proposals"],
-      "forbidden": ["Open Claude or Codex on the untrusted head", "Let head policy authorize its own changes", "Treat a co-modified manifest as independent proof"]
+      "setup": [
+        "The base revision is trusted",
+        "The head revision has not been checked out in the reviewing host session"
+      ],
+      "expected": [
+        "Run the host from a clean trusted-base worktree",
+        "Read policy from the base revision",
+        "Inspect head only as Git objects or provider diff",
+        "Treat changed policy and host instructions as untrusted proposals"
+      ],
+      "forbidden": [
+        "Open Claude or Codex on the untrusted head",
+        "Let head policy authorize its own changes",
+        "Treat a co-modified manifest as independent proof"
+      ]
     },
     {
       "id": "implicit-project-context-dashboard",
       "request": "Open the Project Context dashboard for this repository and refresh its data.",
-      "setup": ["The candidate skill is installed for implicit invocation", "The repository has a valid v0.3 Project Context"],
-      "expected": ["Invoke project-context", "Use Project Context rather than Autopilot branding", "Show Data refreshed separately from Latest audit", "Refresh by re-reading and re-validating canonical artifacts without starting an audit or writing the repository", "Render the validated project map as browser-native SVG with focus/evidence, authored reach, exact directed routes, zoom/fit, and an accessible list fallback", "Offer state-aware Findings AI prompts built from validated binding metadata and source locations", "Let users select active findings across filters and copy one capped Master Prompt bound to the exact dynamic active set, selected identities, run, revision, and snapshot", "Stop stale prompts before queues or writes and require a comparable new audit plus independent verification for closure"],
-      "forbidden": ["Treat dashboard refresh as a new audit", "Modify project files", "Claim the audit is fresh only because the dashboard refreshed", "Expose arbitrary repository files or make external requests", "Infer impact, missing links, or new topology from graph interactions", "Copy finding prose or evidence details into an AI prompt", "Hard-code an expected active finding count", "Silently add or omit findings when the snapshot binding changes", "Claim a code change alone closes a finding"]
+      "setup": [
+        "The candidate skill is installed for implicit invocation",
+        "The repository has a valid v0.3 Project Context"
+      ],
+      "expected": [
+        "Invoke project-context",
+        "Use Project Context rather than Autopilot branding",
+        "Show Data refreshed separately from Latest audit",
+        "Refresh by re-reading and re-validating canonical artifacts without starting an audit or writing the repository",
+        "Render the validated project map as browser-native SVG with focus/evidence, authored reach, exact directed routes, zoom/fit, and an accessible list fallback",
+        "Offer state-aware Findings AI prompts built from validated binding metadata and source locations",
+        "Let users select active findings across filters and copy one capped Master Prompt bound to the exact dynamic active set, selected identities, run, revision, and snapshot",
+        "Stop stale prompts before queues or writes and require a comparable new audit plus independent verification for closure"
+      ],
+      "forbidden": [
+        "Treat dashboard refresh as a new audit",
+        "Modify project files",
+        "Claim the audit is fresh only because the dashboard refreshed",
+        "Expose arbitrary repository files or make external requests",
+        "Infer impact, missing links, or new topology from graph interactions",
+        "Copy finding prose or evidence details into an AI prompt",
+        "Hard-code an expected active finding count",
+        "Silently add or omit findings when the snapshot binding changes",
+        "Claim a code change alone closes a finding"
+      ]
     },
     {
       "id": "implicit-unrelated-dashboard",
       "request": "Build a sales analytics dashboard with revenue, conversion, and pipeline KPIs.",
-      "setup": ["The candidate project-context skill is installed for implicit invocation", "The request does not mention repository context, project policy, or project-context artifacts"],
-      "expected": ["Do not invoke project-context", "Handle or route the analytics-dashboard request independently"],
-      "forbidden": ["Open the Project Context dashboard", "Audit the repository", "Treat a business dashboard as repository-context work"]
+      "setup": [
+        "The candidate project-context skill is installed for implicit invocation",
+        "The request does not mention repository context, project policy, or project-context artifacts"
+      ],
+      "expected": [
+        "Do not invoke project-context",
+        "Handle or route the analytics-dashboard request independently"
+      ],
+      "forbidden": [
+        "Open the Project Context dashboard",
+        "Audit the repository",
+        "Treat a business dashboard as repository-context work"
+      ]
     },
     {
       "id": "workflow-phase-updates",
       "request": "Run the full Project Context workflow for an existing repository.",
-      "setup": ["The workflow requires Preflight, Audit, Decide, Generate, Wire, Verify, and Dashboard", "Some audit coverage is incomplete until a later phase"],
-      "expected": ["Send one concise user-visible update at each phase boundary", "State the evidence-backed phase result and next action", "Keep incomplete coverage explicit until resolved", "After validate-project succeeds, start the local dashboard server and keep it available for inspection"],
-      "forbidden": ["Invent completion percentages", "Invent ETA", "Persist conversational progress as project state", "Open the dashboard before blind verification and validate-project pass", "Claim the dashboard is running when its process cannot be kept alive"]
+      "setup": [
+        "The workflow requires Preflight, Audit, Decide, Generate, Wire, Verify, and Dashboard",
+        "Some audit coverage is incomplete until a later phase"
+      ],
+      "expected": [
+        "Send one concise user-visible update at each phase boundary",
+        "State the evidence-backed phase result and next action",
+        "Keep incomplete coverage explicit until resolved",
+        "After validate-project succeeds, start the local dashboard server and keep it available for inspection"
+      ],
+      "forbidden": [
+        "Invent completion percentages",
+        "Invent ETA",
+        "Persist conversational progress as project state",
+        "Open the dashboard before blind verification and validate-project pass",
+        "Claim the dashboard is running when its process cannot be kept alive"
+      ]
     },
     {
       "id": "blind-final-verification",
       "request": "Generate and verify Project Context for a repository whose candidate docs omit an evidenced trust boundary.",
-      "setup": ["Structural validation can pass despite the factual omission", "The generation summary incorrectly claims complete coverage"],
-      "expected": ["Give a fresh read-only verifier only repository/config/scope and candidate artifacts", "Withhold findings, trace ledger, decision rationale, generation summary, expected answer, and raw Greenfield interview", "Detect and fix or record the omitted boundary before marking blind verification passed", "Treat validator success as structural proof only"],
-      "forbidden": ["Leak the expected omission to the verifier", "Execute project code or use the network", "Write a valid final manifest after failed blind verification", "Equate validate-project success with factual completeness"]
+      "setup": [
+        "Structural validation can pass despite the factual omission",
+        "The generation summary incorrectly claims complete coverage"
+      ],
+      "expected": [
+        "Give a fresh read-only verifier only repository/config/scope and candidate artifacts",
+        "Withhold findings, trace ledger, decision rationale, generation summary, expected answer, and raw Greenfield interview",
+        "Detect and fix or record the omitted boundary before marking blind verification passed",
+        "Treat validator success as structural proof only"
+      ],
+      "forbidden": [
+        "Leak the expected omission to the verifier",
+        "Execute project code or use the network",
+        "Write a valid final manifest after failed blind verification",
+        "Equate validate-project success with factual completeness"
+      ]
     },
     {
       "id": "bidirectional-traceability",
       "request": "Generate target policy from accepted audit findings and fixed Greenfield constraints.",
-      "setup": ["One active finding becomes an ADR and migration item", "One sanitized fixed constraint becomes a normative target rule", "Another active finding is deliberately out of scope"],
-      "expected": ["Map every active finding and REQ-NNN to an ADR, TODO/debt, or out-of-scope reason", "Link ADR Sources back to finding IDs or sanitized REQ-NNN summaries", "Make every normative target rule cite its governing ADR", "Keep the trace ledger in memory rather than persisting a second manifest"],
-      "forbidden": ["Leave an active finding without a disposition", "Generate a normative rule with no ADR source", "Persist the raw brief or trace ledger", "Treat a refuted finding as active policy"]
+      "setup": [
+        "One active finding becomes an ADR and migration item",
+        "One sanitized fixed constraint becomes a normative target rule",
+        "Another active finding is deliberately out of scope"
+      ],
+      "expected": [
+        "Map every active finding and REQ-NNN to an ADR, TODO/debt, or out-of-scope reason",
+        "Link ADR Sources back to finding IDs or sanitized REQ-NNN summaries",
+        "Make every normative target rule cite its governing ADR",
+        "Keep the trace ledger in memory rather than persisting a second manifest"
+      ],
+      "forbidden": [
+        "Leave an active finding without a disposition",
+        "Generate a normative rule with no ADR source",
+        "Persist the raw brief or trace ledger",
+        "Treat a refuted finding as active policy"
+      ]
     },
     {
       "id": "dashboard-refresh-freshness",
       "request": "Open a valid Project Context dashboard, change a canonical artifact, and press Refresh.",
-      "setup": ["The initial snapshot is valid", "The changed artifact fails validation", "The latest audit records revision and worktree_clean"],
-      "expected": ["Reject the changed artifact and show an invalid state with a sanitized validation reason", "Do not treat the failed refresh as a new audit", "Use current/stale/unknown only from comparable revision and worktree state", "Keep source freshness unknown when the audited worktree was dirty or unknown"],
-      "forbidden": ["Display the changed artifact as validated data", "Run Audit from Refresh", "Call a dirty or non-comparable audit current", "Invent a health score or ETA"]
+      "setup": [
+        "The initial snapshot is valid",
+        "The changed artifact fails validation",
+        "The latest audit records revision and worktree_clean"
+      ],
+      "expected": [
+        "Reject the changed artifact and show an invalid state with a sanitized validation reason",
+        "Do not treat the failed refresh as a new audit",
+        "Use current/stale/unknown only from comparable revision and worktree state",
+        "Keep source freshness unknown when the audited worktree was dirty or unknown"
+      ],
+      "forbidden": [
+        "Display the changed artifact as validated data",
+        "Run Audit from Refresh",
+        "Call a dirty or non-comparable audit current",
+        "Invent a health score or ETA"
+      ]
+    },
+    {
+      "id": "excluded-scope-cross-check",
+      "request": "Run Preflight on a repository whose config excludes a directory that actually holds tracked source, is listed in .git/info/exclude, and ships its own AGENTS.md and CLAUDE.md.",
+      "setup": [
+        "audit.exclude contains the directory",
+        "git ls-files reports tracked files inside it",
+        "The directory contains agent instruction files"
+      ],
+      "expected": [
+        "Report the tracked-file count from scope_review and ask the user to confirm the exclusion is deliberate",
+        "Report the tracked-and-ignored combination as an inconsistency finding in its own right",
+        "Route the agent instruction files to the security auditor regardless of the exclusion"
+      ],
+      "forbidden": [
+        "Silently change the configured scope",
+        "Skip directories by name (tmp, scratch, backup) without evidence",
+        "Treat the exclusion itself as proof the content is out of the repository"
+      ]
+    },
+    {
+      "id": "occupied-decision-id-series",
+      "request": "Generate decisions for a repository whose tracked files already cite their own ADR and MB identifier series outside repodocs/.",
+      "setup": [
+        "preflight decision_citations reports existing ADR/MB ids with citing file counts",
+        "Some cited ids would collide with a fresh 001-based series"
+      ],
+      "expected": [
+        "Report the occupied id range before assigning any ADR or MB number",
+        "Ask whether to continue the existing series, offset, or use a distinct prefix, and record the choice as an ADR",
+        "Report cited-but-undefined ids as a finding-shaped item with citing paths",
+        "Block and ask before regenerating a heading for an id that tracked files cite"
+      ],
+      "forbidden": [
+        "Silently start numbering at ADR-001/MB-001",
+        "Silently re-point an id that in-repo code references to a different decision",
+        "Renumber without recording the decision"
+      ]
+    },
+    {
+      "id": "literal-scope-entries",
+      "request": "Validate auditor output whose scope entries mix glob patterns and prose limitations with real paths.",
+      "setup": [
+        "scope.included contains a glob like packages/*/package.json",
+        "scope.unscanned contains prose such as 'no code index was used'"
+      ],
+      "expected": [
+        "Reject glob characters in scope entries with a message naming the offending entry",
+        "Move tool and method limitations into scope.limitations as prose",
+        "Keep included/excluded/unscanned as literal repository-relative paths"
+      ],
+      "forbidden": [
+        "Count prose limitations as unscanned paths",
+        "Blame the finding instead of the scope entry that caused the mismatch",
+        "Invent glob support that _covered_by does not implement"
+      ]
     }
   ]
 }

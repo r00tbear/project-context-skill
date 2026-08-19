@@ -6,6 +6,8 @@ Use one shared `PROJECT_CONTEXT.md` and one canonical skill payload. Do not gene
 
 Merge exactly one block from `templates/host/CLAUDE.block.md` or `templates/host/AGENTS.block.md` into each enabled root file while preserving every byte outside it. New blocks are prepended so the shared-context instruction stays inside host read limits. Existing blocks keep their location.
 
+For a `kind: "managed_block"` manifest artifact, the recorded `sha256` covers the managed block text between the markers (inclusive), not the whole file - the user owns everything outside the markers, so hashing the file would break on any legitimate user edit. A hash mismatch error names which of the two was expected.
+
 The Claude import must be active text. Never use symlinks, lowercase `agents.md`, or extra case-variant/sibling host files next to `CLAUDE.md`/`AGENTS.md`. Duplicate/unbalanced markers, unclear ownership, or overlapping shared policy in the surviving host text block the merge until reconciled.
 
 Preview without writing:

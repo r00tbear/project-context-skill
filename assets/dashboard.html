@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsbGVkYnk9InRpdGxlIGRlc2NyaXB0aW9uIj4KICA8dGl0bGUgaWQ9InRpdGxlIj5Qcm9qZWN0IENvbnRleHQ8L3RpdGxlPgogIDxkZXNjIGlkPSJkZXNjcmlwdGlvbiI+U3F1YXJlIGJyYWNrZXRzIHN1cnJvdW5kaW5nIGEgY29ubmVjdGVkIHRocmVlLW5vZGUgZ3JhcGguPC9kZXNjPgogIDxzdHlsZT4KICAgIC5icmFja2V0IHsgc3Ryb2tlOiAjMjkyNDI2OyB9CiAgICBAbWVkaWEgKHByZWZlcnMtY29sb3Itc2NoZW1lOiBkYXJrKSB7IC5icmFja2V0IHsgc3Ryb2tlOiAjZWVlN2UxOyB9IH0KICA8L3N0eWxlPgogIDxnIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CiAgICA8cGF0aCBjbGFzcz0iYnJhY2tldCIgZD0iTTEwIDVINi41QTEuNSAxLjUgMCAwIDAgNSA2LjV2MTlBMS41IDEuNSAwIDAgMCA2LjUgMjdIMTBNMjIgNWgzLjVBMS41IDEuNSAwIDAgMSAyNyA2LjV2MTlhMS41IDEuNSAwIDAgMS0xLjUgMS41SDIyIiBzdHJva2Utd2lkdGg9IjIiLz4KICAgIDxwYXRoIGQ9Im0xMi4xIDE0LjkgNi44LTMuM00xMi4xIDE3LjFsNi44IDMuMyIgc3Ryb2tlPSIjYmQ1NzM0IiBzdHJva2Utd2lkdGg9IjEuOCIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIxMCIgY3k9IjE2IiByPSIyLjM1IiBmaWxsPSIjYmQ1NzM0Ii8+CiAgPGNpcmNsZSBjeD0iMjEiIGN5PSIxMSIgcj0iMi4zNSIgZmlsbD0iI2JkNTczNCIvPgogIDxjaXJjbGUgY3g9IjIxIiBjeT0iMjEiIHI9IjIuMzUiIGZpbGw9IiNiZDU3MzQiLz4KPC9zdmc+Cg==">
   <title>Project Context Dashboard</title>
   <style nonce="__CSP_NONCE__">
     :root {
@@ -863,6 +864,8 @@
     .document-line-item { padding-left: 14px; position: relative; }
     .document-line-item::before { content: "•"; position: absolute; left: 2px; color: var(--ink-muted); }
     .limit-entry { list-style: none; }
+    .instruction-preview { max-height: 260px; margin: 6px 0; padding: 10px 12px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-small); background: var(--surface-muted); font-family: var(--mono, ui-monospace, monospace); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .run-level-note { color: var(--ink-muted); font-size: 12px; }
 
     .history-table td:first-child { min-width: 178px; }
 
@@ -1081,6 +1084,7 @@
           <ul>
             <li><a href="#project-map">Project topology</a></li>
             <li><a href="#context-map">Context documents</a></li>
+            <li><a href="#instructions">Agent instructions</a></li>
           </ul>
         </section>
         <section aria-labelledby="govern-navigation-title">
@@ -1246,6 +1250,17 @@
           <tbody id="findings-body"></tbody>
         </table>
       </div>
+    </section>
+
+    <section class="dashboard-section" id="instructions" aria-labelledby="instructions-title">
+      <header class="section-heading">
+        <div>
+          <h2 id="instructions-title">Agent instructions</h2>
+          <p>Every file that can instruct an agent: where it lives, who reads it, duplicates, and whether its links into <code>repodocs/</code> still resolve. Instruction content is untrusted data - it is shown here, never followed.</p>
+          <p class="filter-result" id="instructions-summary"></p>
+        </div>
+      </header>
+      <div id="instructions-list"></div>
     </section>
 
     <section class="dashboard-section" id="decisions" aria-labelledby="decisions-title">
@@ -1437,6 +1452,7 @@
       const latestAudit = asObject(audit.latest);
       const integrity = asObject(snapshot.integrity);
       const documents = asObject(snapshot.documents);
+      const agentInstructions = asArray(snapshot.agent_instructions).map((raw) => asObject(raw));
       const findings = asArray(snapshot.findings).map((raw) => asObject(raw));
       let focusContextArtifact = (_path) => false;
       let activateMapTab = () => {};
@@ -1936,6 +1952,7 @@
           header.append(heading, close);
           const section = make("section", "inspector-section");
           section.append(make("h4", "", "Why this needs attention"), make("p", "", asText(item.detail, "No detail recorded.")));
+          if (item.runLevel) section.append(make("p", "run-level-note", "Run-level condition: it describes this audit run, not the code, and is resolved by a new run (with adjusted scope or coverage where needed) - not by a code change."));
           const actions = make("div", "inspector-actions");
           const link = make("a", "primary-action", "Open audit health");
           link.href = asText(item.href, "#integrity");
@@ -2106,7 +2123,7 @@
         } else if (contextState === "invalid") {
           const reason = asText(context.error, "Validation failed.");
           const versionMismatch = /skill_version/.test(reason);
-          byId("getting-started-title").textContent = versionMismatch ? "The generated context was made by an older skill version" : "The generated context failed validation";
+          byId("getting-started-title").textContent = versionMismatch ? "The generated context and the installed skill disagree on version" : "The generated context failed validation";
           byId("getting-started-copy").textContent = `${reason} Invalid output is never trusted or displayed. To regenerate it, ask your agent:`;
           byId("getting-started-command").textContent = "Use $project-context to re-apply the context in this repository.";
           agentPromptText = [
@@ -2117,7 +2134,7 @@
             "",
             "Use $project-context to re-apply the context in this repository:",
             versionMismatch
-              ? "- The installed skill is newer than the generated artifacts. Re-run the full workflow (Audit -> Decide -> Generate -> Wire -> Verify) so every artifact and the manifest are regenerated by the installed version. Never hand-edit the manifest or artifacts just to silence validation."
+              ? "- The installed skill version and the version recorded in the generated manifest differ (either side may be the newer one; check the installed VERSION first and update the skill if it is the stale side). Re-run the full workflow (Audit -> Decide -> Generate -> Wire -> Verify) with the intended skill version so every artifact and the manifest are regenerated by it. Never hand-edit the manifest or artifacts just to silence validation."
               : "- Diagnose the validation error first, then re-run the workflow phases needed to regenerate the affected artifacts. Never hand-edit the manifest or artifacts just to silence validation.",
             "- Confirm decisions carried over from repodocs/decisions.md instead of re-asking everything.",
             "- When the run finishes and validate-project passes, tell me to press Refresh in the dashboard.",
@@ -2131,11 +2148,11 @@
         const systemAttention = [];
         if (contextState === "invalid") systemAttention.push({kind: "integrity", id: "INTEGRITY", title: "Integrity is invalid", detail: asText(context.error, "Validated project context is unavailable."), href: "#integrity"});
         if (contextState === "absent") systemAttention.push({kind: "integrity", id: "CONTEXT", title: "Context is not installed", detail: "No validated Project Context artifacts were found. Ask your agent to run the Project Context audit, then press Refresh.", href: "#integrity"});
-        if (latestAudit.outcome && latestAudit.outcome !== "complete") systemAttention.push({kind: "integrity", id: "COVERAGE", title: "Audit coverage is incomplete", detail: `Latest outcome: ${titleCase(latestAudit.outcome)}.`, href: "#history"});
+        if (latestAudit.outcome && latestAudit.outcome !== "complete") systemAttention.push({kind: "integrity", runLevel: true, id: "COVERAGE", title: "Audit coverage is incomplete", detail: `Latest outcome: ${titleCase(latestAudit.outcome)}.`, href: "#history"});
         const unscanned = asArray(asObject(latestAudit.scope).unscanned);
-        if (unscanned.length) systemAttention.push({kind: "integrity", id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});
-        if (blind === "failed") systemAttention.push({kind: "integrity", id: "BLIND CHECK", title: "Blind verification failed", detail: `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`, href: "#integrity"});
-        if (blind === "not-run") systemAttention.push({kind: "integrity", id: "BLIND CHECK", title: "Blind verification was not run", detail: "Factual completeness was not independently checked for this run.", href: "#integrity"});
+        if (unscanned.length) systemAttention.push({kind: "integrity", runLevel: true, id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});
+        if (blind === "failed") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification failed", detail: `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`, href: "#integrity"});
+        if (blind === "not-run") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification was not run", detail: "Factual completeness was not independently checked for this run.", href: "#integrity"});
         const urgentFindings = active.filter((finding) => ["critical", "high"].includes(currentSeverity(finding))).sort(compareFindings);
         const attention = [...systemAttention, ...urgentFindings.slice(0, 5).map((finding) => ({kind: "finding", finding}))];
         const totalAttention = systemAttention.length + urgentFindings.length;
@@ -3448,6 +3465,84 @@
         return `${asArray(coverage.completed).length} / ${asArray(coverage.required).length}`;
       }
 
+      const HOST_DIRECTORY_PREFIXES = [".claude/", ".agents/", ".codex/", ".cursor/", ".github/"];
+
+      function instructionGroupKey(path) {
+        for (const prefix of HOST_DIRECTORY_PREFIXES) {
+          if (path.startsWith(prefix)) return path.slice(path.indexOf("/") + 1);
+        }
+        return path;
+      }
+
+      function renderInstructions() {
+        const target = byId("instructions-list");
+        target.replaceChildren();
+        if (!agentInstructions.length) {
+          byId("instructions-summary").textContent = "";
+          target.append(emptyState("No agent instruction files found", "Preflight found no files that instruct an agent in this repository."));
+          return;
+        }
+        const groups = new Map();
+        agentInstructions.forEach((entry) => {
+          const key = instructionGroupKey(asText(entry.path));
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(entry);
+        });
+        const duplicateGroups = [...groups.values()].filter((members) => members.length > 1);
+        const trackedCount = agentInstructions.filter((entry) => entry.tracked).length;
+        const danglingCount = agentInstructions.filter((entry) => asArray(entry.links).some((link) => String(asObject(link).status).startsWith("dangling"))).length;
+        byId("instructions-summary").textContent =
+          `${agentInstructions.length} file${agentInstructions.length === 1 ? "" : "s"} · ${trackedCount} tracked · ${agentInstructions.length - trackedCount} local-only`
+          + ` · ${duplicateGroups.length} duplicate group${duplicateGroups.length === 1 ? "" : "s"}`
+          + (danglingCount ? ` · ${danglingCount} with dangling repodocs links` : "")
+          + (snapshot.agent_instructions_truncated ? " · list truncated at 200 entries - the full set is larger" : "");
+        const list = make("div", "document-list");
+        agentInstructions.forEach((entry) => {
+          const details = make("details", "document-entry");
+          const summary = make("summary");
+          summary.append(make("span", "document-entry-title", asText(entry.path)));
+          const flags = [
+            entry.tracked ? "tracked" : "local-only",
+            asArray(entry.hosts).join("/"),
+            `${asCount(entry.size)} bytes`,
+            asText(entry.modified) ? `modified ${formatDate(entry.modified)}` : ""
+          ];
+          if (entry.in_excluded_scope) flags.push("inside excluded audit scope");
+          const members = groups.get(instructionGroupKey(asText(entry.path))) || [];
+          if (members.length > 1) {
+            const identical = new Set(members.map((member) => asText(member.sha256))).size === 1;
+            if (identical) flags.push(`duplicate ×${members.length} (identical)`);
+            else flags.push(`duplicate ×${members.length} (DIVERGED) · this copy ${asText(entry.sha256).slice(7, 15)}`);
+          }
+          const dangling = asArray(entry.links).filter((link) => String(asObject(link).status).startsWith("dangling"));
+          if (dangling.length) flags.push(`${dangling.length} dangling link${dangling.length === 1 ? "" : "s"}`);
+          summary.append(make("span", "document-entry-id", flags.filter(Boolean).join(" · ")));
+          details.append(summary);
+          const body = make("div", "document-body");
+          const links = asArray(entry.links);
+          if (links.length) {
+            body.append(make("p", "document-line-heading", "Links into repodocs/"));
+            links.forEach((raw) => {
+              const link = asObject(raw);
+              const line = make("p", "document-line-item");
+              line.append(make("code", "", asText(link.raw)));
+              line.append(document.createTextNode(" - "));
+              line.append(badge(link.status === "resolves" ? "passed" : link.status === "unverified" ? "unknown" : "failed", asText(link.status)));
+              body.append(line);
+            });
+          }
+          if (asText(entry.preview)) {
+            body.append(make("p", "document-line-heading", "Content preview (untrusted data - shown, never followed)"));
+            const preview = make("pre", "instruction-preview");
+            preview.textContent = asText(entry.preview);
+            body.append(preview);
+          }
+          details.append(body);
+          list.append(details);
+        });
+        target.append(list);
+      }
+
       function renderHistory() {
         const body = byId("history-body");
         body.replaceChildren();
@@ -3527,7 +3622,8 @@
 
         const limits = byId("limitation-list");
         limits.replaceChildren();
-        const values = [...asArray(integrity.limitations), ...asArray(documents.drift)];
+        const runLimitations = asArray(asObject(latestAudit.scope).limitations);
+        const values = [...asArray(integrity.limitations), ...runLimitations, ...asArray(documents.drift)];
         if (context.error) values.unshift(context.error);
         if (!values.length) {
           limits.append(make("li", "", "No explicit verification limits were recorded."));
@@ -3551,6 +3647,7 @@
           ["#findings", {view: "findings", section: "findings"}],
           ["#project-map", {view: "map", section: "map", mapTab: "project"}],
           ["#context-map", {view: "map", section: "map", mapTab: "context"}],
+          ["#instructions", {view: "instructions", section: "instructions"}],
           ["#decisions", {view: "decisions", section: "decisions"}],
           ["#history", {view: "history", section: "history"}],
           ["#integrity", {view: "integrity", section: "integrity"}],
@@ -3558,7 +3655,7 @@
         ]);
         const modeForView = (view) => {
           if (view === "findings") return "remediate";
-          if (view === "map") return "explore";
+          if (view === "map" || view === "instructions") return "explore";
           if (["decisions", "history", "integrity"].includes(view)) return "govern";
           return "monitor";
         };
@@ -3584,7 +3681,7 @@
             window.requestAnimationFrame(() => applyRouteScroll(hash));
           }
           byId("main").dataset.view = route.view;
-          ["overview", "map", "findings", "decisions", "history", "integrity"].forEach((id) => {
+          ["overview", "map", "findings", "instructions", "decisions", "history", "integrity"].forEach((id) => {
             byId(id).hidden = id !== route.section;
           });
           if (route.mapTab) activateMapTab(route.mapTab);
@@ -3643,6 +3740,7 @@
       wireMasterPrompt();
       wireFindingFilters();
       renderDocuments();
+      renderInstructions();
       renderHistory();
       renderIntegrity();
       wireWorkspaceNavigation();

@@ -1,94 +1,297 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/r00tbear/project-context-skill/schemas/findings.schema.json",
-  "title": "project-context findings v2",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schema_version", "run_id", "auditor", "scanned_at", "scope", "findings"],
-  "properties": {
-    "schema_version": {"const": 2},
-    "run_id": {"type": "string", "minLength": 1},
-    "auditor": {"$ref": "#/$defs/auditor"},
-    "scanned_at": {"type": "string", "format": "date-time"},
-    "scope": {"$ref": "#/$defs/scope"},
-    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}}
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/r00tbear/project-context-skill/schemas/findings.schema.json",
+ "title": "project-context findings v2",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "schema_version",
+  "run_id",
+  "auditor",
+  "scanned_at",
+  "scope",
+  "findings"
+ ],
+ "properties": {
+  "schema_version": {
+   "const": 2
   },
-  "$defs": {
-    "auditor": {"enum": ["stack", "architecture", "ui", "data", "bloat", "security", "testing", "greenfield"]},
-    "severity": {"enum": ["low", "medium", "high", "critical"]},
-    "path": {
+  "run_id": {
+   "type": "string",
+   "minLength": 1
+  },
+  "auditor": {
+   "$ref": "#/$defs/auditor"
+  },
+  "scanned_at": {
+   "type": "string",
+   "format": "date-time"
+  },
+  "scope": {
+   "$ref": "#/$defs/scope"
+  },
+  "findings": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/finding"
+   }
+  }
+ },
+ "$defs": {
+  "auditor": {
+   "enum": [
+    "stack",
+    "architecture",
+    "ui",
+    "data",
+    "bloat",
+    "security",
+    "testing",
+    "greenfield"
+   ]
+  },
+  "severity": {
+   "enum": [
+    "low",
+    "medium",
+    "high",
+    "critical"
+   ]
+  },
+  "path": {
+   "type": "string",
+   "minLength": 1,
+   "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\\\n\\r\\u0000]).+$"
+  },
+  "scope": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "included",
+    "excluded",
+    "unscanned"
+   ],
+   "properties": {
+    "included": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "$ref": "#/$defs/scopePath"
+     }
+    },
+    "excluded": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "$ref": "#/$defs/scopePath"
+     }
+    },
+    "unscanned": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "$ref": "#/$defs/scopePath"
+     }
+    },
+    "limitations": {
+     "type": "array",
+     "items": {
       "type": "string",
-      "minLength": 1,
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\\\n\\r\\u0000]).+$"
+      "minLength": 1
+     },
+     "description": "Tool and method limitations in prose; never paths. Path lists stay in included/excluded/unscanned."
+    }
+   }
+  },
+  "evidence": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "path",
+    "detail"
+   ],
+   "properties": {
+    "path": {
+     "$ref": "#/$defs/path"
     },
-    "scope": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["included", "excluded", "unscanned"],
-      "properties": {
-        "included": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
-        "excluded": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
-        "unscanned": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}}
-      }
+    "line": {
+     "type": "integer",
+     "minimum": 1
     },
-    "evidence": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "detail"],
-      "properties": {
-        "path": {"$ref": "#/$defs/path"},
-        "line": {"type": "integer", "minimum": 1},
-        "detail": {"type": "string", "minLength": 1}
+    "detail": {
+     "type": "string",
+     "minLength": 1
+    }
+   }
+  },
+  "identity": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "path",
+    "assertion"
+   ],
+   "properties": {
+    "path": {
+     "$ref": "#/$defs/path"
+    },
+    "assertion": {
+     "type": "string",
+     "minLength": 1
+    },
+    "symbol": {
+     "type": "string",
+     "minLength": 1
+    }
+   }
+  },
+  "verification": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "counterevidence",
+    "note"
+   ],
+   "properties": {
+    "status": {
+     "enum": [
+      "pending",
+      "not-required",
+      "confirmed",
+      "downgraded",
+      "refuted"
+     ]
+    },
+    "resulting_severity": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/severity"
+      },
+      {
+       "type": "null"
       }
+     ]
+    },
+    "counterevidence": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/evidence"
+     }
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "if": {
+    "properties": {
+     "status": {
+      "enum": [
+       "downgraded",
+       "refuted"
+      ]
+     }
+    }
+   },
+   "then": {
+    "properties": {
+     "counterevidence": {
+      "minItems": 1
+     }
+    }
+   }
+  },
+  "finding": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "kind",
+    "title",
+    "severity",
+    "confidence",
+    "identity",
+    "status",
+    "evidence",
+    "verification"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^[a-z]+-[0-9]{3,}$"
+    },
+    "kind": {
+     "type": "string",
+     "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "severity": {
+     "$ref": "#/$defs/severity"
+    },
+    "confidence": {
+     "enum": [
+      "low",
+      "medium",
+      "high"
+     ]
     },
     "identity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "assertion"],
-      "properties": {
-        "path": {"$ref": "#/$defs/path"},
-        "assertion": {"type": "string", "minLength": 1},
-        "symbol": {"type": "string", "minLength": 1}
-      }
+     "$ref": "#/$defs/identity"
+    },
+    "status": {
+     "enum": [
+      "new",
+      "persisting",
+      "resolved",
+      "refuted"
+     ]
+    },
+    "evidence": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "$ref": "#/$defs/evidence"
+     }
     },
     "verification": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["status", "counterevidence", "note"],
-      "properties": {
-        "status": {"enum": ["pending", "not-required", "confirmed", "downgraded", "refuted"]},
-        "resulting_severity": {
-          "anyOf": [{"$ref": "#/$defs/severity"}, {"type": "null"}]
-        },
-        "counterevidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
-        "note": {"type": "string"}
-      },
-      "if": {"properties": {"status": {"enum": ["downgraded", "refuted"]}}},
-      "then": {"properties": {"counterevidence": {"minItems": 1}}}
-    },
-    "finding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "kind", "title", "severity", "confidence", "identity", "status", "evidence", "verification"],
-      "properties": {
-        "id": {"type": "string", "pattern": "^[a-z]+-[0-9]{3,}$"},
-        "kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
-        "title": {"type": "string", "minLength": 1},
-        "severity": {"$ref": "#/$defs/severity"},
-        "confidence": {"enum": ["low", "medium", "high"]},
-        "identity": {"$ref": "#/$defs/identity"},
-        "status": {"enum": ["new", "persisting", "resolved", "refuted"]},
-        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}},
-        "verification": {"$ref": "#/$defs/verification"}
-      },
-      "if": {"properties": {"severity": {"enum": ["high", "critical"]}}},
-      "then": {
-        "properties": {
-          "verification": {
-            "properties": {"status": {"enum": ["pending", "confirmed", "downgraded", "refuted"]}}
-          }
-        }
-      }
+     "$ref": "#/$defs/verification"
     }
+   },
+   "if": {
+    "properties": {
+     "severity": {
+      "enum": [
+       "high",
+       "critical"
+      ]
+     }
+    }
+   },
+   "then": {
+    "properties": {
+     "verification": {
+      "properties": {
+       "status": {
+        "enum": [
+         "pending",
+         "confirmed",
+         "downgraded",
+         "refuted"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "scopePath": {
+   "type": "string",
+   "minLength": 1,
+   "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\\\n\\r\\u0000])(?!.*[*?\\[]).+$",
+   "description": "Literal repository-relative path; glob characters are rejected by validate-findings."
   }
+ }
 }
