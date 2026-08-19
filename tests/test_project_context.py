@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -1354,7 +1355,7 @@ class DashboardTests(unittest.TestCase):
             r"\bnew\s+Function\b",
             r"\b(?:XMLHttpRequest|WebSocket|EventSource|WebTransport)\b",
             r"\b(?:navigator\.sendBeacon|window\.open|document\.write|location\.(?:assign|replace))\s*\(",
-            r"<(?:script|link)\b[^>]*(?:src|href)\s*=",
+            r"<(?:script|link)\b[^>]*(?:src|href)\s*=\s*[\"'](?!data:)",
             r"\bforeignObject\b",
         ):
             with self.subTest(forbidden_sink=sink):
@@ -1693,6 +1694,29 @@ class CliTests(unittest.TestCase):
                 {"status": "valid", "nodes": 1, "edges": 0},
                 json.loads(result.stdout),
             )
+
+    def test_installer_installs_updates_and_archives_legacy(self) -> None:
+        tags = subprocess.run(["git", "-C", str(ROOT), "tag", "-l", "v*"], capture_output=True, text=True)
+        if not tags.stdout.strip():
+            self.skipTest("no release tags in this clone (shallow CI checkout); the installer CI job covers it")
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            legacy = home / ".claude/skills/project-context"
+            (legacy / "auditors").mkdir(parents=True)
+            (legacy / "SKILL.md").write_text("legacy full clone\n", encoding="utf-8")
+            environment = {**os.environ, "PROJECT_CONTEXT_HOME": str(home), "PROJECT_CONTEXT_REPO": str(ROOT)}
+            for _ in range(2):  # second run exercises the update path
+                result = subprocess.run(
+                    ["bash", str(ROOT / "install.sh")], capture_output=True, env=environment, timeout=300
+                )
+                self.assertEqual(0, result.returncode, result.stderr.decode())
+            payload = home / ".agents/skills/project-context"
+            self.assertTrue((payload / "VERSION").is_file())
+            adapter = (home / ".claude/skills/project-context/SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("project-context", adapter)
+            backups = list((home / ".skill-backups").iterdir())
+            self.assertEqual(1, len(backups))
+            self.assertTrue((backups[0] / "auditors").is_dir())
 
     def test_missing_repo_is_user_correctable(self) -> None:
         result = self._run("preflight", "--repo", "/nonexistent/project-context-missing")

@@ -24,7 +24,42 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
+      - run: bash -n install.sh
       - run: python3 scripts/project_context.py self-check --skill-root .
       - run: python3 -m unittest discover -s tests -v
       # Whole-tree whitespace lint (explicit: diff against the empty tree, stable under shallow clones)
       - run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+
+  installer:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the installer resolves the latest release tag from the clone source
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Run install.sh against this checkout
+        if: runner.os != 'Windows'
+        run: |
+          export PROJECT_CONTEXT_HOME="$RUNNER_TEMP/pc-home"
+          export PROJECT_CONTEXT_REPO="$PWD"
+          bash install.sh
+          bash install.sh # second run must take the update path
+          test -f "$PROJECT_CONTEXT_HOME/.agents/skills/project-context/VERSION"
+          test -f "$PROJECT_CONTEXT_HOME/.claude/skills/project-context/SKILL.md"
+      - name: Run install.ps1 against this checkout
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PROJECT_CONTEXT_HOME = Join-Path $env:RUNNER_TEMP "pc-home"
+          $env:PROJECT_CONTEXT_REPO = "$PWD"
+          ./install.ps1
+          ./install.ps1 # second run must take the update path
+          if (-not (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION"))) { exit 1 }
+          if (-not (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\SKILL.md"))) { exit 1 }
