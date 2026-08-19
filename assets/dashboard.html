@@ -858,6 +858,11 @@
     .document-entry-id { display: block; margin-top: 3px; color: var(--ink-muted); font-size: 12px; }
     .document-body { padding: 0 10px 14px 0; color: var(--ink-muted); }
     .document-body p { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .document-body code { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--ink, inherit); background: rgba(255, 255, 255, 0.06); padding: 0 4px; border-radius: 4px; }
+    .document-line-heading { font-weight: 600; color: var(--ink, inherit); margin-top: 12px; }
+    .document-line-item { padding-left: 14px; position: relative; }
+    .document-line-item::before { content: "•"; position: absolute; left: 2px; color: var(--ink-muted); }
+    .limit-entry { list-style: none; }
 
     .history-table td:first-child { min-width: 178px; }
 
@@ -1260,7 +1265,7 @@
               <th scope="col">Audit time</th>
               <th scope="col">Outcome</th>
               <th scope="col">Revision</th>
-              <th scope="col">Coverage</th>
+              <th scope="col" title="Auditors completed / required in that run — not code or test coverage">Coverage</th>
               <th scope="col">Unscanned</th>
               <th scope="col">Blind check</th>
               <th scope="col">jCodeMunch</th>
@@ -1836,8 +1841,9 @@
         document.title = `${asText(project.name, "Repository")} · Project Context`;
       }
 
-      function statusMetric(term, value, detail, state) {
+      function statusMetric(term, value, detail, state, hint) {
         const wrapper = make("div");
+        if (hint) wrapper.title = hint;
         wrapper.append(make("dt", "", term));
         const definition = make("dd");
         if (state) definition.append(badge(state, value));
@@ -2046,12 +2052,18 @@
 
         const strip = byId("status-strip");
         strip.replaceChildren(
-          statusMetric("Integrity", titleCase(contextState), asText(context.error), contextState),
-          statusMetric("Audit", titleCase(latestAudit.outcome), asText(latestAudit.id), latestAudit.outcome),
-          statusMetric("Coverage", `${completed.length} / ${required.length}`, required.length ? "required auditors" : "not recorded"),
-          statusMetric("Active findings", String(active.length), `${findings.length} total`),
-          statusMetric("Critical / high", `${activeCritical.length} / ${activeHigh.length}`, "effective severity"),
-          statusMetric("Blind check", titleCase(blind), asCount(asObject(latestAudit.verification).issues) ? `${asCount(asObject(latestAudit.verification).issues)} issues` : "", blind)
+          statusMetric("Integrity", titleCase(contextState), asText(context.error), contextState,
+            "Structural validation of the generated context: manifest ownership, content hashes and wikilinks."),
+          statusMetric("Audit", titleCase(latestAudit.outcome), asText(latestAudit.id), latestAudit.outcome,
+            "Outcome of the latest audit run; the identifier below is its immutable run id."),
+          statusMetric("Auditor coverage", `${completed.length} / ${required.length}`, required.length ? "auditors completed of required" : "not recorded", undefined,
+            "How many of the required topic auditors (stack, architecture, security, ...) completed in the latest run. Not code or test coverage."),
+          statusMetric("Active findings", String(active.length), `${findings.length} total`, undefined,
+            "Findings with status new or persisting; the total also counts resolved and refuted history."),
+          statusMetric("Critical / high", `${activeCritical.length} / ${activeHigh.length}`, "effective severity", undefined,
+            "Active findings counted by effective severity - the severity after independent verification."),
+          statusMetric("Blind check", titleCase(blind), asCount(asObject(latestAudit.verification).issues) ? `${asCount(asObject(latestAudit.verification).issues)} issues` : "", blind,
+            "Independent completeness verifier that reviewed the context without seeing findings or expected answers.")
         );
 
         const systemAttention = [];
@@ -2715,8 +2727,8 @@
           const upstreamNames = [...reach.upstream.nodes].map((id) => nodeReference(nodeById.get(id))).sort(compareText);
           const downstreamNames = [...reach.downstream.nodes].map((id) => nodeReference(nodeById.get(id))).sort(compareText);
           addDefinition(definitions, "ID", asText(node.id, "Not available"), true);
-          addDefinition(definitions, `Upstream (${upstreamNames.length})`, upstreamNames.join(", ") || "None authored");
-          addDefinition(definitions, `Downstream (${downstreamNames.length})`, downstreamNames.join(", ") || "None authored");
+          addDefinition(definitions, `Upstream reach (${upstreamNames.length})`, upstreamNames.join(", ") || "None authored");
+          addDefinition(definitions, `Downstream reach (${downstreamNames.length})`, downstreamNames.join(", ") || "None authored");
           addDefinition(definitions, "Group", asText(node.group, "Ungrouped"));
           inspector.append(definitions);
           const evidence = safeEvidence(node.evidence);
@@ -3215,17 +3227,34 @@
         });
       }
 
+      function formattedLine(line) {
+        let text = typeof line === "string" ? line : JSON.stringify(line);
+        let className = "";
+        if (text.startsWith("### ")) { text = text.slice(4); className = "document-line-heading"; }
+        else if (text.startsWith("- ")) { text = text.slice(2); className = "document-line-item"; }
+        const paragraph = make("p", className);
+        const parts = text.split("`");
+        parts.forEach((part, index) => {
+          if (!part) return;
+          if (index % 2 === 1 && parts.length > 2) paragraph.append(make("code", "", part));
+          else paragraph.append(document.createTextNode(part));
+        });
+        if (!paragraph.childNodes.length) paragraph.append(document.createTextNode(text));
+        return paragraph;
+      }
+
       function documentEntry(raw, fallbackTitle) {
         const entry = asObject(raw);
         const details = make("details", "document-entry");
         const summary = make("summary");
         summary.append(make("span", "document-entry-title", asText(entry.title || entry.heading, fallbackTitle)));
-        const identity = [asText(entry.id), asText(entry.path), Number.isInteger(entry.line) ? `line ${entry.line}` : ""].filter(Boolean).join(" · ");
+        const entryTitle = asText(entry.title || entry.heading, fallbackTitle);
+        const identity = [asText(entry.id) === entryTitle ? "" : asText(entry.id), asText(entry.meta), asText(entry.path), Number.isInteger(entry.line) ? `line ${entry.line}` : ""].filter(Boolean).join(" · ");
         if (identity) summary.append(make("span", "document-entry-id", identity));
         details.append(summary);
         const body = make("div", "document-body");
         const content = Array.isArray(entry.lines) ? entry.lines : Array.isArray(entry.body) ? entry.body : [entry.body || entry.details || entry.summary].filter(Boolean);
-        content.forEach((line) => body.append(make("p", "", typeof line === "string" ? line : JSON.stringify(line))));
+        content.forEach((line) => body.append(formattedLine(line)));
         if (!content.length) body.append(make("p", "", "No summary text was recorded."));
         details.append(body);
         return details;
@@ -3332,8 +3361,9 @@
           values.forEach((raw) => {
             if (typeof raw === "string") limits.append(make("li", "", raw));
             else {
-              const value = asObject(raw);
-              limits.append(make("li", "", [asText(value.title || value.heading), asText(value.summary || value.body || value.details)].filter(Boolean).join(": ") || "Unspecified limit"));
+              const item = make("li", "limit-entry");
+              item.append(documentEntry(raw, "Unspecified limit"));
+              limits.append(item);
             }
           });
         }
@@ -3358,10 +3388,27 @@
           if (["decisions", "history", "integrity"].includes(view)) return "govern";
           return "monitor";
         };
+        if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+        const subanchorRoutes = new Set(["#snapshot-view", "#integrity-checks-title"]);
+        const applyRouteScroll = (hash) => {
+          // A route hash is a screen, not a scroll target: the browser's native anchor
+          // scroll would push the header off-screen on load. Sub-anchors keep intent.
+          if (subanchorRoutes.has(hash)) {
+            const target = document.getElementById(hash.slice(1));
+            if (target) target.scrollIntoView();
+          } else {
+            window.scrollTo(0, 0);
+          }
+        };
+        let lastRouteHash = null;
         const update = () => {
           const requested = window.location.hash || "#attention";
           const route = views.get(requested) || views.get("#attention");
           const hash = views.has(requested) ? requested : "#attention";
+          if (hash !== lastRouteHash) {
+            lastRouteHash = hash;
+            window.requestAnimationFrame(() => applyRouteScroll(hash));
+          }
           byId("main").dataset.view = route.view;
           ["overview", "map", "findings", "decisions", "history", "integrity"].forEach((id) => {
             byId(id).hidden = id !== route.section;
@@ -3388,6 +3435,7 @@
           byId("main").focus();
         });
         window.addEventListener("hashchange", update);
+        window.addEventListener("load", () => applyRouteScroll(lastRouteHash || "#attention"), {once: true});
         byId("attention-inspector").addEventListener("keydown", (event) => {
           if (event.key === "Escape" && !event.target.closest("textarea")) closeAttentionInspector();
         });
