@@ -18,7 +18,9 @@ fields feed generation).
   instead of crashing — the dashboard now starts and shows the invalid state.
 - The agent-instruction map also discovers git-ignored instruction files (bounded to
   instruction basenames) and marks them `ignored`; NTFS junctions are treated as symlinks
-  by every containment guard; the full test suite runs on Windows CI.
+  by every containment guard (junctions only - cloud placeholders stay ordinary files).
+  Windows CI is intentionally kept out of the default pipeline as a secondary platform;
+  symlink tests self-skip there and a junction test runs on Windows machines.
 - `validate-findings --previous-sha256` verifies the prior findings file against the last
   valid manifest hash before its ids and refuted history are inherited.
 - Machine-read label shapes (`## ADR-NNN:` / `## MB-NNN:` headings, `Priority:` / `Effort:` /

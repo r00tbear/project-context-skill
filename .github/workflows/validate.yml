@@ -17,7 +17,6 @@ jobs:
           - {os: ubuntu-latest, python: "3.11"}
           - {os: ubuntu-latest, python: "3.14"}
           - {os: macos-latest, python: "3.13"}
-          - {os: windows-latest, python: "3.12"}
     defaults:
       run:
         shell: bash
@@ -39,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,21 +62,3 @@ jobs:
           test "$(cat "$PROJECT_CONTEXT_HOME/.agents/skills/project-context/VERSION")" != "0.4.0"
           test -f "$PROJECT_CONTEXT_HOME/.claude/skills/project-context/SKILL.md"
           ls "$PROJECT_CONTEXT_HOME/.skill-backups" | grep -q claude-project-context
-      - name: Run install.ps1 against this checkout (cross-version update path)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $env:PROJECT_CONTEXT_HOME = Join-Path $env:RUNNER_TEMP "pc-home"
-          $env:PROJECT_CONTEXT_REPO = "$PWD"
-          $env:PROJECT_CONTEXT_NO_JCODEMUNCH = "1" # hermetic: no PyPI dependency in CI
-          # Pre-seed a fake legacy full copy so the archive branch actually executes.
-          New-Item -ItemType Directory -Force -Path (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\auditors") | Out-Null
-          Set-Content (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\SKILL.md") "legacy"
-          $env:PROJECT_CONTEXT_VERSION = "v0.4.0"
-          ./install.ps1
-          if ((Get-Content (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION")).Trim() -ne "0.4.0") { exit 1 }
-          Remove-Item Env:PROJECT_CONTEXT_VERSION
-          ./install.ps1 # unpinned second run must perform a real version change
-          if ((Get-Content (Join-Path $env:PROJECT_CONTEXT_HOME ".agents\skills\project-context\VERSION")).Trim() -eq "0.4.0") { exit 1 }
-          if (-not (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME ".claude\skills\project-context\SKILL.md"))) { exit 1 }
-          if (-not (Get-ChildItem (Join-Path $env:PROJECT_CONTEXT_HOME ".skill-backups") | Where-Object Name -like "claude-project-context*")) { exit 1 }

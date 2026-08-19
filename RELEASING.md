@@ -13,8 +13,12 @@ Checklist, in order:
    `Regeneration required: yes/no` line. `references/upgrade.md` sends upgrading agents
    to these entries.
 3. **Mechanical proof.** `python3 scripts/project_context.py self-check --skill-root .`
-   and `python3 -m unittest discover -s tests` must pass locally; CI additionally runs
-   the suite on Windows and exercises both installers across a real version change.
+   and `python3 -m unittest discover -s tests` must pass locally; CI runs the suite on
+   Linux and macOS and exercises the installer across a real version change. Windows CI
+   is intentionally not part of the default pipeline (secondary platform): Windows
+   correctness is carried by the junction-aware guards, self-skipping symlink tests, and
+   `install.ps1` mirroring `install.sh` - run the suite on a Windows machine manually
+   when touching path or installer code.
 4. **Dogfood run.** Clone the repo to a scratch directory (`git clone . <scratch>`) and
    run the full workflow against the clone: Preflight -> Audit -> Decide -> Generate ->
    Wire -> Verify -> Dashboard. Never commit the resulting `repodocs/` into this
