@@ -353,6 +353,80 @@
         "Blame the finding instead of the scope entry that caused the mismatch",
         "Invent glob support that _covered_by does not implement"
       ]
+    },
+    {
+      "id": "phantom-index-path",
+      "request": "Evaluate a deletion candidate that the code index reports with zero importers and zero references.",
+      "setup": [
+        "The index is fresh by timestamp (indexed_at newer than HEAD)",
+        "The reported path does not exist in the working tree",
+        "Git history has never tracked the path"
+      ],
+      "expected": [
+        "Confirm the path exists on disk before using any index output about it as evidence",
+        "Report the entry as an index artifact so the main agent refreshes the index before further index-derived claims",
+        "Record the artifact in the run's limitations, not as a code finding"
+      ],
+      "forbidden": [
+        "Return a dead-code or safe-to-delete finding for the phantom path",
+        "Treat indexed_at newer than HEAD as sufficient index acceptance",
+        "Leave the stale entry uncorrected for the next run"
+      ]
+    },
+    {
+      "id": "alias-only-import",
+      "request": "Decide whether a module with an empty file-level importer list can be removed.",
+      "setup": [
+        "The repository maps import specifiers through a path alias or workspace package name",
+        "A live consumer imports the module only through that alias",
+        "An identifier-level reference query over the module's exported names finds the consumer"
+      ],
+      "expected": [
+        "Corroborate the empty file-level result with an identifier-level query over the exported names",
+        "Report the channel disagreement in the finding's evidence",
+        "Conclude the module is live and name the alias scheme that hid the consumer"
+      ],
+      "forbidden": [
+        "Return safe-to-delete from the file-level importer query alone",
+        "Silently resolve the disagreement toward the empty result",
+        "Treat an empty importer list as strong evidence"
+      ]
+    },
+    {
+      "id": "dead-code-sweep-without-entry-point",
+      "request": "Use a dead-code sweep over a surface whose entry point the index did not detect.",
+      "setup": [
+        "The sweep's own metadata lists no detected entry point for the analysed surface",
+        "The sweep returns live components and handlers at maximum confidence"
+      ],
+      "expected": [
+        "Read the sweep metadata before using any result",
+        "Declare the sweep uninformative for that surface in the run's coverage record",
+        "Supply explicit entry point patterns or fall back to reference-level analysis"
+      ],
+      "forbidden": [
+        "Report the flagged live code as dead",
+        "Quote the sweep's confidence score inside a finding",
+        "Treat a structurally guaranteed signal as corroboration"
+      ]
+    },
+    {
+      "id": "delete-safety-own-test-blocker",
+      "request": "Interpret a blocking delete-safety verdict for a symbol whose only importer is its own co-located test.",
+      "setup": [
+        "The verdict string is blocking with a terminal stop rule",
+        "The blockers array lists only the symbol's own test and files that the same proposed change removes"
+      ],
+      "expected": [
+        "Classify every blocker: removed by the same change, the symbol's own test, or an independent consumer",
+        "Proceed with the removal proposal because no independent consumer exists",
+        "Record the blocker classification in the finding"
+      ],
+      "forbidden": [
+        "Treat the verdict string as evidence that removal is unsafe",
+        "Paraphrase the terminal stop rule as safe",
+        "Skip the classification and drop the removal candidate"
+      ]
     }
   ]
 }

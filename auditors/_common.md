@@ -12,6 +12,7 @@ Act as a read-only auditor. Return exactly one schema-v2 JSON object shaped by t
 ## Evidence
 
 - Every finding needs exact repository-relative path evidence, an optional line, and a neutral factual detail. When useful, identify the inspected symbol or evidence channel inside that detail.
+- Classify content matches before use: an import edge, a prose mention, or a test double. Prose never blocks a removal (list it as a follow-up edit); a test double naming a module the unit under test does not import is a finding for the testing auditor, not a dependency.
 - Scores, summaries, naming conventions, README claims, and jCodeMunch heuristics only prioritize inspection. Confirm them against source, configuration, references, or other authoritative artifacts.
 - Separate severity from confidence. Use lower confidence and name the limitation when evidence is incomplete.
 - Preserve an ID only when kind and normalized identity path/symbol/assertion still describe the same fact. Never reuse IDs or discard resolved/refuted history.
@@ -27,6 +28,10 @@ Act as a read-only auditor. Return exactly one schema-v2 JSON object shaped by t
 ## jCodeMunch
 
 Use only the fresh, repository-bound index and topic routing supplied by the main agent. Keep calls narrow. Do not index, refresh, use semantic search, or search for secrets from an auditor. Directly inspect authoritative or unsupported formats. Treat missing parser/tool coverage as a limitation, not a clean result.
+
+- A removal, deletion, or "no consumers" claim needs two differently-shaped index queries in agreement plus one non-index confirmation (direct read, Git history, or build/test configuration); a disagreement between channels goes into the evidence, never silently resolved. Differently shaped means the queries cannot share a blind spot: a verdict read against its own blockers is one channel, not two, and two queries that both resolve import specifiers as written do not count as different for an importer claim.
+- "No importers" and exact importer counts MUST be corroborated at identifier level over the file's exported names, with the repository's alias, workspace-name, and barrel scheme accounted for. An empty importer/reference result is weak evidence; a non-empty one is strong.
+- Confirm every index-reported path exists on disk before citing it: a fresh index can retain files that no longer exist, and a phantom path looks exactly like the perfect deletion candidate. Report such an entry as an index artifact in the run's limitations, never as dead code; the main agent refreshes the index before further index-derived claims.
 
 ## Calibration
 
