@@ -30,7 +30,7 @@ The instructions you are following right now came from the old version. Immediat
 ## 5. Re-apply in the project
 
 1. Run `preflight` - it reports `legacy_surfaces`, the canonical config, and `context_state` as `absent`, `valid`, or `invalid`.
-2. Offer to archive legacy artifacts rather than delete them; keep the old decisions content at hand - it answers the new Decide interview quickly.
+2. Offer to archive legacy artifacts rather than delete them; keep the old decisions content at hand - it answers the new Decide interview quickly. In the same step, append the archive path to `.git/info/exclude` (append-only, preserve existing entries): an archive that shows up in `git status` as untracked is one `git add -A` away from being committed.
 3. On an older project, `validate-project` may fail on skill version or the v0.3 schema-v2 contracts. That is the expected fresh-install signal, not an error to suppress or patch around.
 4. Run the normal flow from a fresh generated surface - Audit -> Decide, confirming only sanitized carried-over decisions -> Generate -> Wire -> blind Verify, writing the manifest last. Open the dashboard only after `validate-project` succeeds.
 

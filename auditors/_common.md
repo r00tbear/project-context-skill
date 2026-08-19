@@ -15,6 +15,14 @@ Act as a read-only auditor. Return exactly one schema-v2 JSON object shaped by t
 - Scores, summaries, naming conventions, README claims, and jCodeMunch heuristics only prioritize inspection. Confirm them against source, configuration, references, or other authoritative artifacts.
 - Separate severity from confidence. Use lower confidence and name the limitation when evidence is incomplete.
 - Preserve an ID only when kind and normalized identity path/symbol/assertion still describe the same fact. Never reuse IDs or discard resolved/refuted history.
+- When a finding persists from the previous run, copy its `identity` object byte for byte and keep its `kind`; put improved wording in `title` or `evidence[].detail`. A reworded `identity.assertion` under the same id fails validation as an identity change.
+
+## Output shape
+
+- `scope.included`, `scope.excluded`, and `scope.unscanned` hold literal repository-relative paths only - no globs, no prose. Tool and method limitations ("the index parser does not cover Bash", "no database was contacted") go into `scope.limitations` as prose strings; a limitation is never an unscanned path.
+- Every `evidence` record requires `path` and a non-empty `detail`; `line` is optional.
+- Every finding carries the complete `verification` object: `status`, `counterevidence`, and `note` are all required, even when nothing was verified. A routine low/medium finding uses exactly:
+  `"verification": {"status": "not-required", "counterevidence": [], "note": ""}`
 
 ## jCodeMunch
 

@@ -21,6 +21,7 @@ from scripts.project_context import (
     sha256_bytes,
     sha256_text,
     strict_json_loads,
+    strip_code_spans,
     validate_config,
     validate_findings,
     validate_inventory,
@@ -221,6 +222,11 @@ class DocumentValidationTests(unittest.TestCase):
         previous = finding_document()
         current = copy.deepcopy(previous)
         current["findings"][0]["identity"]["assertion"] = "A different claim"
+        with self.assertRaisesRegex(ContractError, "assertion changed .* copy identity byte for byte"):
+            validate_findings(current, previous)
+        current = copy.deepcopy(previous)
+        current["findings"][0]["identity"]["path"] = "src/other"
+        current["findings"][0]["evidence"][0]["path"] = "src/other"
         with self.assertRaisesRegex(ContractError, "reused"):
             validate_findings(current, previous)
         previous["findings"][0]["id"] = "testing-001"
@@ -263,6 +269,25 @@ class DocumentValidationTests(unittest.TestCase):
             validate_findings(value)
         finding["verification"]["resulting_severity"] = "medium"
         validate_findings(value)
+
+    def test_scope_rejects_globs_and_accepts_limitations(self) -> None:
+        value = finding_document()
+        value["scope"]["included"] = ["packages/*/package.json"]
+        with self.assertRaisesRegex(ContractError, r"glob characters.*packages/\*/package\.json"):
+            validate_findings(value)
+        value = finding_document()
+        value["scope"]["limitations"] = ["The index parser does not cover Bash; those files were read directly."]
+        validate_findings(value)
+        value["scope"]["limitations"] = [""]
+        with self.assertRaisesRegex(ContractError, "limitations"):
+            validate_findings(value)
+
+    def test_strip_code_spans_hides_quoted_wikilinks(self) -> None:
+        text = "Real [[context]] link.\nQuoted `[[decisions#ADR-025|ADR-025]]` example.\n```\n[[fenced#Anchor]]\n```\n"
+        stripped = strip_code_spans(text)
+        self.assertIn("[[context]]", stripped)
+        self.assertNotIn("ADR-025", stripped)
+        self.assertNotIn("fenced", stripped)
 
     def test_resulting_severity_must_match_unless_downgraded(self) -> None:
         value = finding_document()
@@ -1048,6 +1073,59 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
             self.assertNotIn("agents.md", preflight(root)["legacy_surfaces"])
+
+    def test_preflight_scope_review_cross_checks_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "repodocs").mkdir()
+            config_value = config()
+            config_value["audit"]["exclude"] = ["skip-zone"]
+            (root / "repodocs/project-context.config.json").write_text(json.dumps(config_value), encoding="utf-8")
+            (root / "skip-zone/prototype").mkdir(parents=True)
+            (root / "skip-zone/prototype/app.ts").write_text("export {}\n", encoding="utf-8")
+            (root / "skip-zone/prototype/AGENTS.md").write_text("instructions\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "skip-zone"], check=True)
+            (root / ".gitignore").write_text("skip-zone/\n", encoding="utf-8")
+            review = preflight(root)["scope_review"]
+            self.assertEqual(1, len(review))
+            entry = review[0]
+            self.assertEqual("skip-zone", entry["path"])
+            self.assertEqual(2, entry["tracked_files"])
+            self.assertTrue(entry["tracked_and_ignored"])
+            self.assertEqual(["skip-zone/prototype/AGENTS.md"], entry["agent_instruction_files"])
+
+    def test_preflight_reports_existing_decision_citations(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "notes.ts").write_text("// per ADR-031 and MB-022\n// see ADR-031 again\n", encoding="utf-8")
+            (root / "repodocs").mkdir()
+            (root / "repodocs/decisions.md").write_text("ADR-099 must not be reported\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+            citations = preflight(root)["decision_citations"]
+            self.assertEqual({"ADR-031", "MB-022"}, {entry["id"] for entry in citations})
+            adr = next(entry for entry in citations if entry["id"] == "ADR-031")
+            self.assertEqual(["notes.ts"], adr["files"])
+
+    def test_preflight_maps_agent_instructions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "AGENTS.md").write_text("root instructions\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "AGENTS.md"], check=True)
+            (root / ".cursor/rules").mkdir(parents=True)
+            (root / ".cursor/rules/style.mdc").write_text("rule\n", encoding="utf-8")
+            (root / ".agents/skills/demo/reference").mkdir(parents=True)
+            (root / ".agents/skills/demo/SKILL.md").write_text("skill\n", encoding="utf-8")
+            (root / ".agents/skills/demo/reference/deep.md").write_text("internal\n", encoding="utf-8")
+            entries = {entry["path"]: entry for entry in preflight(root)["agent_instructions"]}
+            self.assertIn("AGENTS.md", entries)
+            self.assertTrue(entries["AGENTS.md"]["tracked"])
+            self.assertIn(".cursor/rules/style.mdc", entries)
+            self.assertFalse(entries[".cursor/rules/style.mdc"]["tracked"])
+            self.assertIn(".agents/skills/demo/SKILL.md", entries)
+            self.assertNotIn(".agents/skills/demo/reference/deep.md", entries)
 
     def test_preflight_requires_exact_git_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

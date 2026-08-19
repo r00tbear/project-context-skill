@@ -45,6 +45,13 @@ ID_RE = re.compile(r"[a-z][a-z0-9_-]*\Z")
 FINDING_ID_RE = re.compile(r"[a-z]+-[0-9]{3,}\Z")
 WIKILINK_RE = re.compile(r"\[\[([a-z][a-z0-9_-]*)(?:#([A-Za-z0-9][A-Za-z0-9_-]*))?(?:\|[^\]\n]+)?\]\]")
 WIKILINK_TOKEN_RE = re.compile(r"\[\[([^\[\]\n]+)\]\]")
+FENCED_CODE_RE = re.compile(r"^```.*?^```[ \t]*$", re.MULTILINE | re.DOTALL)
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+
+def strip_code_spans(text: str) -> str:
+    """Code spans may quote a wikilink without creating one; drop them before link extraction."""
+    return INLINE_CODE_RE.sub("", FENCED_CODE_RE.sub("", text))
 CORE_DOMAINS = {"architecture", "stack", "security", "testing"}
 ALL_DOMAINS = CORE_DOMAINS | {"ui", "data"}
 ARTIFACT_KINDS = {"owned_file", "managed_block"}
@@ -253,12 +260,20 @@ def validate_config(value: Any) -> dict[str, Any]:
 
 def _validate_scope(value: Any, label: str) -> dict[str, Any]:
     scope = _mapping(value, label)
-    _exact_keys(scope, {"included", "excluded", "unscanned"}, label)
+    _exact_keys(scope, {"included", "excluded", "unscanned"}, label, {"limitations"})
     for key in ("included", "excluded", "unscanned"):
         paths = _unique_strings(scope[key], f"{label}.{key}")
         for index, path in enumerate(paths):
+            if any(character in path for character in "*?["):
+                raise ContractError(
+                    f"{label}.{key}[{index}] contains glob characters; scope entries are literal repository-relative paths: {path}"
+                )
             if path != ".":
                 validate_relative_path(path, f"{label}.{key}[{index}]")
+    if "limitations" in scope:
+        limitations = _list(scope["limitations"], f"{label}.limitations")
+        for index, item in enumerate(limitations):
+            _text(item, f"{label}.limitations[{index}]")
     return scope
 
 
@@ -366,6 +381,14 @@ def validate_findings(value: Any, previous: Any | None = None, *, allow_provisio
                 raise ContractError(f"previous finding id was removed: {item['id']}")
             current = current_by_id[item["id"]]
             if (current["kind"], current["identity"]) != (item["kind"], item["identity"]):
+                same_anchor = current["kind"] == item["kind"] and all(
+                    current["identity"].get(key) == item["identity"].get(key) for key in ("path", "symbol")
+                )
+                if same_anchor:
+                    raise ContractError(
+                        f"identity.assertion changed for persisting finding {item['id']}: "
+                        "copy identity byte for byte from the previous run and put new wording in title or evidence detail"
+                    )
                 raise ContractError(f"previous finding id was reused: {item['id']}")
             if item["status"] == "refuted" and current["status"] in {"new", "persisting"}:
                 raise ContractError(f"refuted finding cannot return as active under the same id: {item['id']}")
@@ -378,7 +401,9 @@ def validate_findings(value: Any, previous: Any | None = None, *, allow_provisio
                     or _covered_by(path, [*candidate["excluded"], *candidate["unscanned"]])
                     for candidate in (old_scope, scope)
                 ):
-                    raise ContractError(f"resolved finding was outside comparable completed scope: {item['id']}")
+                    raise ContractError(
+                        f"resolved finding was outside comparable completed scope: {item['id']} (identity path: {path})"
+                    )
     return document
 
 
@@ -803,6 +828,123 @@ def _context_state(root: Path) -> tuple[str, str | None]:
     return "valid", None
 
 
+_INSTRUCTION_BASENAMES = {"agents.md", "claude.md", "claude.local.md", "agents.project-context.md"}
+_INSTRUCTION_CONFIG_FILES = {".claude/settings.json", ".claude/settings.local.json", ".claude/hooks.json", ".codex/config.toml"}
+
+
+def _is_agent_instruction(path: str) -> bool:
+    lowered = path.lower()
+    if lowered.rsplit("/", 1)[-1] in _INSTRUCTION_BASENAMES:
+        return True
+    if lowered in _INSTRUCTION_CONFIG_FILES:
+        return True
+    if lowered.startswith(".cursor/rules/") or lowered.startswith(".cursor/commands"):
+        return True
+    for skills_root in (".github/skills/", ".claude/skills/", ".agents/skills/", ".codex/skills/"):
+        if lowered.startswith(skills_root) and lowered.endswith(".md"):
+            # One logical unit per vendored skill: its SKILL.md (any depth) or a file at the
+            # skills root. Internal reference files would flood the map fifty entries deep.
+            remainder = lowered[len(skills_root):]
+            return remainder.rsplit("/", 1)[-1] == "skill.md" or "/" not in remainder
+    return False
+
+
+def _instruction_hosts(path: str) -> list[str]:
+    lowered = path.lower()
+    hosts: list[str] = []
+    if lowered.rsplit("/", 1)[-1] in {"claude.md", "claude.local.md"} or lowered.startswith(".claude/"):
+        hosts.append("claude")
+    if lowered.rsplit("/", 1)[-1] in {"agents.md", "agents.project-context.md"} or lowered.startswith((".codex/", ".agents/")):
+        hosts.append("codex")
+    if lowered.startswith(".cursor/"):
+        hosts.append("cursor")
+    if lowered.startswith(".github/"):
+        hosts.append("github")
+    return hosts or ["unknown"]
+
+
+def _agent_instruction_map(root: Path) -> list[dict[str, Any]]:
+    """Inventory every file that can instruct an agent. Discovery honours the repository's
+    own ignore rules, except host-configuration directories, which are always checked."""
+    tracked_result = _git(root, "ls-files", "-z")
+    tracked = {p for p in tracked_result.stdout.split("\0") if p} if tracked_result.returncode == 0 else set()
+    others_result = _git(root, "ls-files", "-z", "--others", "--exclude-standard")
+    others = {p for p in others_result.stdout.split("\0") if p} if others_result.returncode == 0 else set()
+    candidates = {p for p in tracked | others if _is_agent_instruction(p)}
+    for extra in ("CLAUDE.local.md", ".claude", ".agents", ".codex", ".cursor"):
+        base = root / extra
+        if base.is_file() and not base.is_symlink():
+            candidates.add(extra)
+        elif base.is_dir() and not base.is_symlink():
+            for directory, dirnames, filenames in os.walk(base, followlinks=False):
+                dirnames[:] = [d for d in dirnames if not (Path(directory) / d).is_symlink()]
+                for name in filenames:
+                    file_path = Path(directory) / name
+                    if file_path.is_symlink():
+                        continue
+                    relative = file_path.relative_to(root).as_posix()
+                    if _is_agent_instruction(relative):
+                        candidates.add(relative)
+    entries: list[dict[str, Any]] = []
+    for relative in sorted(candidates):
+        path = root / relative
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            raw = _read_regular(path, relative)
+        except ContractError:
+            continue
+        entries.append(
+            {
+                "path": relative,
+                "tracked": relative in tracked,
+                "size": len(raw),
+                "sha256": sha256_bytes(raw),
+                "hosts": _instruction_hosts(relative),
+            }
+        )
+        if len(entries) == 200:
+            break
+    return entries
+
+
+def _scope_review(root: Path, exclusions: list[str]) -> list[dict[str, Any]]:
+    """Cross-check configured exclusions against git without changing what gets scanned."""
+    review: list[dict[str, Any]] = []
+    for excluded in exclusions:
+        ls_result = _git(root, "ls-files", "-z", "--", excluded)
+        tracked_files = [p for p in ls_result.stdout.split("\0") if p] if ls_result.returncode == 0 else []
+        # --no-index: pure pattern matching, so a TRACKED path that ignore rules also match
+        # is reported - that combination is a no-op ignore and usually a forgotten git rm --cached.
+        ignored = _git(root, "check-ignore", "-q", "--no-index", "--", excluded).returncode == 0
+        review.append(
+            {
+                "path": excluded,
+                "tracked_files": len(tracked_files),
+                "tracked_and_ignored": bool(tracked_files) and ignored,
+                "agent_instruction_files": sorted(p for p in tracked_files if _is_agent_instruction(p))[:20],
+            }
+        )
+    return review
+
+
+def _decision_citations(root: Path) -> list[dict[str, Any]]:
+    """Existing ADR/MB citations in tracked files outside repodocs/; generation must not collide with them."""
+    result = _git(root, "grep", "-I", "-o", "-E", r"(ADR|MB)-[0-9]+", "--", ".", ":(exclude)repodocs")
+    if result.returncode != 0:
+        return []
+    citations: dict[str, set[str]] = {}
+    for line in result.stdout.splitlines():
+        path, _, match = line.rpartition(":")
+        if not path or not re.fullmatch(r"(ADR|MB)-[0-9]+", match):
+            continue
+        citations.setdefault(match, set()).add(path)
+    return [
+        {"id": citation_id, "file_count": len(files), "files": sorted(files)[:20]}
+        for citation_id, files in sorted(citations.items())
+    ]
+
+
 def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     root = _resolve_existing(repo, "repository path")
     if not root.is_dir():
@@ -870,6 +1012,19 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     context_state, context_error = _context_state(root)
     evidence = _source_evidence(root)
     worktree_clean = _source_worktree_clean(root)
+    exclusions: list[str] = []
+    config_path = root / CONFIG_PATH
+    if config_path.is_file():
+        try:
+            config = validate_config(
+                strict_json_loads(_decode_text(_read_regular(config_path, CONFIG_PATH), CONFIG_PATH), CONFIG_PATH)
+            )
+            exclusions = list(config["audit"]["exclude"])
+        except ContractError:
+            exclusions = []  # an invalid config is already reported through context_state
+    instruction_map = _agent_instruction_map(root)
+    for entry in instruction_map:
+        entry["in_excluded_scope"] = _covered_by(entry["path"], exclusions)
     effective_skill = _resolve_existing(skill_root or Path(__file__).resolve().parents[1], "skill root")
     return {
         "status": "safe",
@@ -884,6 +1039,9 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         "canonical_config": CONFIG_PATH,
         "config_exists": (root / CONFIG_PATH).is_file(),
         "legacy_surfaces": legacy,
+        "scope_review": _scope_review(root, exclusions),
+        "decision_citations": _decision_citations(root),
+        "agent_instructions": instruction_map,
         "skill_root": str(effective_skill),
     }
 
@@ -997,7 +1155,12 @@ def _validated_project(repo: Path) -> dict[str, Any]:
             if artifact["kind"] == "owned_file" and artifact["path"].endswith(".md"):
                 markdown[artifact["path"]] = decoded
         if actual_hash != artifact["sha256"]:
-            raise ContractError(f"artifact hash mismatch: {artifact['path']}")
+            hash_subject = (
+                "sha256 of the managed block text between the markers, not the whole file"
+                if artifact["kind"] == "managed_block"
+                else "sha256 of the normalized file text"
+            )
+            raise ContractError(f"artifact hash mismatch: {artifact['path']} (expected {hash_subject})")
         artifacts_by_id[artifact["id"]] = artifact
         artifact_bytes[artifact["id"]] = raw
     if set(host_artifacts) != set(manifest["hosts"]):
@@ -1134,11 +1297,13 @@ def _validated_project(repo: Path) -> dict[str, Any]:
             paths = [finding["identity"]["path"]]
             paths.extend(item["path"] for item in finding["evidence"])
             paths.extend(item["path"] for item in finding["verification"]["counterevidence"])
-            if any(
-                not path_is_in_scope(path, latest_scope) or not path_is_in_scope(path, findings["scope"])
-                for path in paths
-            ):
-                raise ContractError(f"active finding is outside completed audit scope: {finding['id']}")
+            for path in paths:
+                if not path_is_in_scope(path, latest_scope) or not path_is_in_scope(path, findings["scope"]):
+                    raise ContractError(
+                        f"active finding is outside completed audit scope: {finding['id']} "
+                        f"(identity path {path} is not covered by scope.included minus excluded/unscanned; "
+                        "scope entries are literal paths, not globs)"
+                    )
         findings_by_auditor[auditor] = findings
     governance_paths = {
         "repodocs/decisions.md",
@@ -1165,10 +1330,11 @@ def _validated_project(repo: Path) -> dict[str, Any]:
     wikilink_entries: list[dict[str, str]] = []
     artifact_ids_by_path = {artifact["path"]: artifact_id for artifact_id, artifact in artifacts_by_id.items()}
     for relative, text in markdown.items():
-        tokens = WIKILINK_TOKEN_RE.findall(text)
-        if text.count("[[") != len(tokens) or text.count("]]") != len(tokens):
+        scan_text = strip_code_spans(text)
+        tokens = WIKILINK_TOKEN_RE.findall(scan_text)
+        if scan_text.count("[[") != len(tokens) or scan_text.count("]]") != len(tokens):
             raise ContractError(f"{relative} has malformed wikilink markers")
-        links = WIKILINK_RE.findall(text)
+        links = WIKILINK_RE.findall(scan_text)
         if len(links) != len(tokens):
             raise ContractError(f"{relative} has malformed wikilinks")
         wikilinks += len(links)
@@ -1260,6 +1426,38 @@ def _snapshot_id(value: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+_REPODOCS_LINK_RE = re.compile(r"repodocs/[A-Za-z0-9_./-]+\.(?:md|json)(?:#[A-Za-z0-9_-]+)?")
+
+
+def _instruction_view(root: Path, entries: list[dict[str, Any]], markdown: dict[str, str] | None) -> list[dict[str, Any]]:
+    """Read-only enrichment for the dashboard: content preview plus repodocs link status.
+    Instruction content is untrusted data; it is shown, never followed or summarised."""
+    view: list[dict[str, Any]] = []
+    for entry in entries:
+        item = dict(entry)
+        links: list[dict[str, str]] = []
+        try:
+            raw = _read_regular(root / entry["path"], entry["path"])
+            text = raw[:65536].decode("utf-8", errors="replace")
+            item["preview"] = text[:2000]
+            for raw_link in sorted(set(_REPODOCS_LINK_RE.findall(text)))[:30]:
+                target_path, _, fragment = raw_link.partition("#")
+                if markdown is None:
+                    status = "unverified"
+                elif target_path not in markdown:
+                    status = "dangling-file"
+                elif fragment and f'<a id="{fragment}"></a>' not in markdown[target_path]:
+                    status = "dangling-anchor"
+                else:
+                    status = "resolves"
+                links.append({"raw": raw_link, "status": status})
+        except ContractError:
+            item["preview"] = ""
+        item["links"] = links
+        view.append(item)
+    return view
+
+
 def dashboard_snapshot(repo: Path) -> dict[str, Any]:
     """Build a read-only dashboard model from the same validated project contract."""
     current = preflight(repo)
@@ -1300,6 +1498,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         },
     }
     if current["context_state"] != "valid":
+        model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], None)
         model["snapshot_id"] = _snapshot_id(model)
         return model
 
@@ -1309,6 +1508,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         model["context"]["state"] = "invalid"
         model["context"]["error"] = str(exc).replace(str(root), "<repo>")
         model["integrity"]["status"] = "invalid"
+        model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], None)
         model["snapshot_id"] = _snapshot_id(model)
         return model
 
@@ -1411,6 +1611,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         ],
         "limitations": limitations,
     }
+    model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], markdown)
     model["snapshot_id"] = _snapshot_id(model)
     return model
 
@@ -1578,6 +1779,7 @@ def self_check(skill_root: Path) -> dict[str, Any]:
         "examples/inventory.json",
         "examples/project-map.json",
         "templates/PROJECT_CONTEXT.md",
+        "templates/audit-inventory.json",
         "templates/project-context.config.json",
         "templates/project-context.manifest.json",
         "templates/project-map.json",
@@ -1602,6 +1804,7 @@ def self_check(skill_root: Path) -> dict[str, Any]:
     load_json(root / "schemas/findings.schema.json")
     load_json(root / "schemas/project-map.schema.json")
     validate_config(load_json(root / "templates/project-context.config.json"))
+    validate_inventory(load_json(root / "templates/audit-inventory.json"))
     validate_project_map(load_json(root / "templates/project-map.json"))
     validate_project_map(load_json(root / "examples/project-map.json"))
     manifest = validate_manifest(load_json(root / "templates/project-context.manifest.json"))
