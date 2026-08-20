@@ -6,6 +6,48 @@ enforces this by `(major, minor)` of the recorded skill version: a patch delta i
 warning, a minor/major delta reports `context_state: invalid` until the audit is re-run.
 Before v0.5.0 the check was strict: any version delta invalidated the context.
 
+## v0.5.1
+
+**Regeneration required: no** (patch: installer, dashboard and validator-side fixes;
+generated document shapes are unchanged, existing contexts stay valid with a patch-delta
+warning).
+
+Everything below was found by the v0.5.0 dogfood run (the skill audited its own repository):
+
+- `install.sh` no longer dies silently under `pipefail` when no release tag matches; an
+  unreachable repository and a missing release tag are now reported as distinct errors,
+  mirroring `install.ps1`.
+- `install.ps1` extends `PATH` with the per-user bin directory *before* looking up
+  `jcodemunch-mcp`/`uv`/`pipx` (matching `install.sh`) and honours `PROJECT_CONTEXT_HOME`
+  there instead of hardcoding `$HOME`. A mirror test pins both invariants, and CI now
+  syntax-checks `install.ps1` with `pwsh` on Linux/macOS runners.
+- Dashboard previews of host configuration files are withheld: their values routinely
+  carry credentials, and the dashboard now reports them by location only, never by
+  content. The rule covers the known config paths (`.claude/settings*.json`, MCP
+  registrations, `.codex/config.toml`, …) and every non-Markdown instruction file
+  (e.g. a JSON or script under `.cursor/rules/`).
+- The instruction-map link classifier resolves links to the whole generated surface -
+  manifest-owned JSON artifacts (e.g. `repodocs/project-map.json`) plus the config and
+  manifest files themselves - instead of mislabelling them `dangling-file`.
+- The dashboard's HTTP boundary (token route, Host allow-list, method gating, HEAD
+  body suppression, security headers) is now covered by socket-level tests, and the
+  installer tag-resolution failure has a behavioral test.
+- Governance entries longer than the dashboard's 8-line body cap get an explicit
+  "entry truncated here" marker line instead of being cut silently; `<a id>` anchor
+  lines are navigation markup and no longer count as (or render inside) body text.
+- Unmanaged-repodocs warnings surface on the dashboard as their own grouped attention
+  item instead of masquerading as a version-skew warning.
+- The self-check payload registry is enforced both ways: unregistered files under the
+  payload directories now fail `self-check` (this immediately caught two unregistered
+  READMEs), and `validate-project` warns about unmanaged files under `repodocs/`.
+- Blind verification has a hard bound: after eight passes without meeting the stopping
+  rule, the run records the unresolved issues and `verification.blind: failed`.
+- The occupied-ADR/MB-series rule now follows the decision matrix: at levels where the
+  agent decides autonomously it continues the existing series at the next free id and
+  records that as an ADR, instead of always stopping to ask.
+- The installer test's skip reason no longer claims CI coverage of `install.ps1` that
+  did not exist.
+
 ## v0.5.0
 
 **Regeneration required: yes** (the version-skew policy itself changed, and new preflight

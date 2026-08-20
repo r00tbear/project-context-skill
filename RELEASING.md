@@ -17,8 +17,9 @@ Checklist, in order:
    Linux and macOS and exercises the installer across a real version change. Windows CI
    is intentionally not part of the default pipeline (secondary platform): Windows
    correctness is carried by the junction-aware guards, self-skipping symlink tests, and
-   `install.ps1` mirroring `install.sh` - run the suite on a Windows machine manually
-   when touching path or installer code.
+   `install.ps1` mirroring `install.sh` (pinned by the mirror test, syntax-checked by
+   `pwsh` in CI) - run the suite on a Windows machine manually when touching path or
+   installer code.
 4. **Dogfood run.** Clone the repo to a scratch directory (`git clone . <scratch>`) and
    run the full workflow against the clone: Preflight -> Audit -> Decide -> Generate ->
    Wire -> Verify -> Dashboard. Never commit the resulting `repodocs/` into this

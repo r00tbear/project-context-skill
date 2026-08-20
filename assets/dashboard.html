@@ -2153,7 +2153,10 @@
         if (unscanned.length) systemAttention.push({kind: "integrity", runLevel: true, id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});
         if (blind === "failed") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification failed", detail: `${asCount(asObject(latestAudit.verification).issues)} issue${asCount(asObject(latestAudit.verification).issues) === 1 ? "" : "s"} remain.`, href: "#integrity"});
         if (blind === "not-run") systemAttention.push({kind: "integrity", runLevel: true, id: "BLIND CHECK", title: "Blind verification was not run", detail: "Factual completeness was not independently checked for this run.", href: "#integrity"});
-        asArray(context.warnings).forEach((warning) => systemAttention.push({kind: "integrity", runLevel: true, id: "VERSION", title: "Skill and context versions differ by a patch release", detail: asText(warning), href: "#integrity"}));
+        const warningTexts = asArray(context.warnings).map((warning) => asText(warning));
+        const unmanagedWarnings = warningTexts.filter((warning) => warning.startsWith("unmanaged file in repodocs/"));
+        warningTexts.filter((warning) => !warning.startsWith("unmanaged file in repodocs/")).forEach((warning) => systemAttention.push({kind: "integrity", runLevel: true, id: "VERSION", title: "Skill and context versions differ by a patch release", detail: warning, href: "#integrity"}));
+        if (unmanagedWarnings.length) systemAttention.push({kind: "integrity", runLevel: true, id: "REPODOCS", title: `Unmanaged file${unmanagedWarnings.length === 1 ? "" : "s"} under repodocs/`, detail: unmanagedWarnings.slice(0, 3).join(" · ") + (unmanagedWarnings.length > 3 ? ` · and ${unmanagedWarnings.length - 3} more` : ""), href: "#integrity"});
         const urgentFindings = active.filter((finding) => ["critical", "high"].includes(currentSeverity(finding))).sort(compareFindings);
         const attention = [...systemAttention, ...urgentFindings.slice(0, 5).map((finding) => ({kind: "finding", finding}))];
         const totalAttention = systemAttention.length + urgentFindings.length;
@@ -3532,7 +3535,10 @@
               body.append(line);
             });
           }
-          if (asText(entry.preview)) {
+          if (entry.preview_redacted === true) {
+            body.append(make("p", "document-line-heading", "Content preview withheld"));
+            body.append(make("p", "", "Host configuration files can carry credentials in their values; this dashboard reports them by location only, never by content."));
+          } else if (asText(entry.preview)) {
             body.append(make("p", "document-line-heading", "Content preview (untrusted data - shown, never followed)"));
             const preview = make("pre", "instruction-preview");
             preview.textContent = asText(entry.preview);

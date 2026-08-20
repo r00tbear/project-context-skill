@@ -89,6 +89,9 @@ Copy-Item (Join-Path $Payload "templates\host\claude-skill-adapter.md") (Join-Pa
 if ($env:PROJECT_CONTEXT_NO_JCODEMUNCH -eq "1") {
     Say "skipping jCodeMunch (PROJECT_CONTEXT_NO_JCODEMUNCH=1); the skill requires it at run time"
 } else {
+    # uv/pipx install into per-user bin directories that may not be on PATH yet.
+    # Extend PATH before ANY lookup (mirrors install.sh), honouring PROJECT_CONTEXT_HOME.
+    $env:PATH = (Join-Path $HomeDir ".local\bin") + ";$env:LOCALAPPDATA\Programs\Python\Scripts;$env:PATH"
     if (-not (Get-Command jcodemunch-mcp -ErrorAction SilentlyContinue)) {
         if (Get-Command uv -ErrorAction SilentlyContinue) {
             Say "installing jCodeMunch with uv"
@@ -101,8 +104,6 @@ if ($env:PROJECT_CONTEXT_NO_JCODEMUNCH -eq "1") {
         } else {
             Fail "jCodeMunch is required and neither uv nor pipx is available. Install uv first (https://docs.astral.sh/uv/): powershell -c `"irm https://astral.sh/uv/install.ps1 | iex`" - then re-run this installer."
         }
-        # uv/pipx install into per-user bin directories that may not be on PATH yet.
-        $env:PATH = "$HOME\.local\bin;$env:LOCALAPPDATA\Programs\Python\Scripts;$env:PATH"
     }
     if (-not (Get-Command jcodemunch-mcp -ErrorAction SilentlyContinue)) {
         Fail "jcodemunch-mcp installed but not on PATH; open a new terminal and re-run this installer."

@@ -1,17 +1,26 @@
 import copy
+import http.client
 import json
 import os
+import re
+import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from collections import Counter
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 from scripts.project_context import (
     HOST_MARKERS,
     ContractError,
+    _dashboard_handler_class,
+    _instruction_view,
+    _markdown_sections,
     dashboard_snapshot,
     extract_host_block,
     merge_host_text,
@@ -627,6 +636,17 @@ class ProjectValidationTests(unittest.TestCase):
         (root / "repodocs/decisions.md").write_text(decisions, encoding="utf-8")
         next(item for item in manifest["artifacts"] if item["id"] == "decisions")["sha256"] = sha256_text(decisions)
         (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    def test_warns_on_unmanaged_repodocs_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_project(root)
+            self.assertEqual([], validate_project(root)["warnings"])
+            (root / "repodocs/notes.md").write_text("stray hand-written notes\n", encoding="utf-8")
+            self.assertIn(
+                "unmanaged file in repodocs/: repodocs/notes.md (not owned by the manifest)",
+                validate_project(root)["warnings"],
+            )
 
     def test_detects_host_block_drift_and_absence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1258,6 +1278,19 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
         self.assertEqual("valid", result["status"])
         self.assertEqual(SKILL_VERSION, result["version"])
 
+    def test_self_check_rejects_unregistered_payload_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            copy_root = Path(temporary) / "payload"
+            shutil.copytree(
+                ROOT,
+                copy_root,
+                ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "tests", ".github", "repodocs"),
+            )
+            self.assertEqual("valid", self_check(copy_root)["status"])
+            (copy_root / "templates/unregistered-doc.md").write_text("stray payload file\n", encoding="utf-8")
+            with self.assertRaisesRegex(ContractError, "unregistered.*templates/unregistered-doc.md"):
+                self_check(copy_root)
+
 
 class DashboardTests(unittest.TestCase):
     @staticmethod
@@ -1725,6 +1758,157 @@ class DashboardTests(unittest.TestCase):
             self.assertNotIn(hostile, html)
             self.assertIn("\\u003c/script\\u003e", html)
 
+    def test_markdown_sections_mark_truncated_bodies_explicitly(self) -> None:
+        long_entry = "## ADR-100: Long\n" + "\n".join(f"- body line {index}" for index in range(10)) + "\n"
+        sections = _markdown_sections(long_entry, "ADR")
+        self.assertEqual(9, len(sections[0]["lines"]))
+        self.assertTrue(sections[0]["lines"][-1].startswith("…"))
+        self.assertIn("truncated", sections[0]["lines"][-1])
+        exact_entry = "## ADR-101: Exact\n" + "\n".join(f"- body line {index}" for index in range(8)) + "\n"
+        sections = _markdown_sections(exact_entry, "ADR")
+        self.assertEqual(8, len(sections[0]["lines"]))
+        self.assertFalse(any("truncated" in line for line in sections[0]["lines"]))
+
+    def test_markdown_sections_ignore_anchors_in_canonical_multi_entry_documents(self) -> None:
+        # The canonical template puts the NEXT entry's <a id> anchor above its heading;
+        # an 8-line entry followed by an anchor must not read as truncated, and the
+        # anchor must never surface as body text of the previous entry.
+        canonical = (
+            '<a id="ADR-100"></a>\n## ADR-100: First\n'
+            + "\n".join(f"- bullet {index}" for index in range(8))
+            + '\n\n<a id="ADR-101"></a>\n## ADR-101: Second\n- short body\n'
+        )
+        sections = _markdown_sections(canonical, "ADR")
+        self.assertEqual(["ADR-100", "ADR-101"], [section["id"] for section in sections])
+        self.assertEqual(8, len(sections[0]["lines"]))
+        self.assertFalse(any("truncated" in line for line in sections[0]["lines"]))
+        self.assertNotIn("<a id=", sections[0]["summary"])
+        self.assertEqual(["- short body"], sections[1]["lines"])
+
+    def test_instruction_view_resolves_artifacts_and_redacts_config_previews(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "CLAUDE.md").write_text(
+                "See repodocs/architecture.md and repodocs/architecture.md#shape.\n"
+                "Data: repodocs/project-map.json and repodocs/project-map.json#frag.\n"
+                "Gone: repodocs/missing.md\n",
+                encoding="utf-8",
+            )
+            (root / ".claude").mkdir()
+            (root / ".claude/settings.local.json").write_text(
+                '{"apiKey": "sk-SECRETVALUE", "docs": "repodocs/architecture.md"}\n', encoding="utf-8"
+            )
+            entries = [{"path": "CLAUDE.md"}, {"path": ".claude/settings.local.json"}]
+            markdown = {"repodocs/architecture.md": 'Intro\n<a id="shape"></a>\n'}
+            artifact_paths = {"repodocs/architecture.md", "repodocs/project-map.json"}
+            view = _instruction_view(root, entries, markdown, artifact_paths)
+            statuses = {link["raw"]: link["status"] for link in view[0]["links"]}
+            self.assertEqual(
+                {
+                    "repodocs/architecture.md": "resolves",
+                    "repodocs/architecture.md#shape": "resolves",
+                    "repodocs/project-map.json": "resolves",
+                    "repodocs/project-map.json#frag": "dangling-anchor",
+                    "repodocs/missing.md": "dangling-file",
+                },
+                statuses,
+            )
+            self.assertIn("repodocs/architecture.md", view[0]["preview"])
+            self.assertNotIn("preview_redacted", view[0])
+            # Host configuration values (credentials) never reach the snapshot.
+            self.assertEqual("", view[1]["preview"])
+            self.assertTrue(view[1]["preview_redacted"])
+            self.assertNotIn("sk-SECRETVALUE", json.dumps(view))
+            self.assertEqual(
+                {"repodocs/architecture.md": "resolves"},
+                {link["raw"]: link["status"] for link in view[1]["links"]},
+            )
+            unverified = _instruction_view(root, entries, None)
+            self.assertTrue(all(link["status"] == "unverified" for item in unverified for link in item["links"]))
+
+    def test_snapshot_redacts_config_previews_and_resolves_ownership_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            revision = self._commit_source(root, "baseline\n")
+            ProjectValidationTests._write_project(root, revision=revision)
+            (root / "CLAUDE.md").write_text(
+                merge_host_text(
+                    "Map: repodocs/project-map.json - owned by repodocs/project-context.manifest.json\n", "claude"
+                ),
+                encoding="utf-8",
+            )
+            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+            (root / ".claude").mkdir()
+            (root / ".claude/settings.json").write_text('{"token": "sk-EXTREMELY-SECRET"}\n', encoding="utf-8")
+            snapshot = dashboard_snapshot(root)
+            self.assertEqual("valid", snapshot["context"]["state"])
+            entries = {entry["path"]: entry for entry in snapshot["agent_instructions"]}
+            self.assertTrue(entries[".claude/settings.json"]["preview_redacted"])
+            self.assertNotIn("sk-EXTREMELY-SECRET", json.dumps(snapshot))
+            statuses = {link["raw"]: link["status"] for link in entries["CLAUDE.md"]["links"]}
+            self.assertEqual("resolves", statuses["repodocs/project-map.json"])
+            self.assertEqual("resolves", statuses["repodocs/project-context.manifest.json"])
+            self.assertNotIn("sk-EXTREMELY-SECRET", render_dashboard_html(root, nonce="test_nonce").decode("utf-8"))
+
+    def test_http_boundary_serves_only_the_token_route(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            revision = self._commit_source(root, "baseline\n")
+            ProjectValidationTests._write_project(root, revision=revision)
+            (root / "CLAUDE.md").write_text(merge_host_text("", "claude"), encoding="utf-8")
+            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+            server = ThreadingHTTPServer(("127.0.0.1", 0), _dashboard_handler_class(root, "/token123/"))
+            server.daemon_threads = True
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                def request(method: str, target: str, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], bytes]:
+                    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=30)
+                    try:
+                        connection.request(method, target, headers=headers or {})
+                        response = connection.getresponse()
+                        return response.status, {k.lower(): v for k, v in response.getheaders()}, response.read()
+                    finally:
+                        connection.close()
+
+                status, headers, body = request("GET", "/token123/")
+                self.assertEqual(200, status)
+                self.assertIn("default-src 'none'", headers["content-security-policy"])
+                self.assertEqual("nosniff", headers["x-content-type-options"])
+                self.assertEqual("no-store", headers["cache-control"])
+                self.assertIn(b"Project Context", body)
+                for target in ("/", "/token123", "/token123/?probe=1", "/other/", "/token123/../"):
+                    with self.subTest(target=target):
+                        self.assertEqual(404, request("GET", target)[0])
+                status, headers, _ = request("POST", "/token123/")
+                self.assertEqual(405, status)
+                self.assertEqual("GET, HEAD", headers["allow"])
+                self.assertEqual(400, request("GET", "/token123/", {"Host": "evil.example"})[0])
+                # HEAD over a raw socket: http.client discards HEAD bodies client-side,
+                # so only the wire proves the server sent headers and nothing else.
+                with socket.create_connection(("127.0.0.1", server.server_port), timeout=30) as raw:
+                    raw.sendall(
+                        f"HEAD /token123/ HTTP/1.1\r\nHost: 127.0.0.1:{server.server_port}\r\n"
+                        "Connection: close\r\n\r\n".encode()
+                    )
+                    wire = b""
+                    while chunk := raw.recv(65536):
+                        wire += chunk
+                head, separator, rest = wire.partition(b"\r\n\r\n")
+                self.assertEqual(b"200", head.split(b"\r\n")[0].split(b" ")[1])
+                self.assertEqual(b"\r\n\r\n", separator)
+                self.assertEqual(b"", rest)
+                declared = re.search(rb"content-length: (\d+)", head, re.IGNORECASE)
+                self.assertIsNotNone(declared)
+                assert declared is not None
+                self.assertGreater(int(declared.group(1)), 1000)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=10)
+
 
 class CliTests(unittest.TestCase):
     """The CLI contract: exit codes 0/4/70, JSON errors on stderr, exact stdout bytes."""
@@ -1781,7 +1965,56 @@ class CliTests(unittest.TestCase):
                 json.loads(result.stdout),
             )
 
-    @unittest.skipIf(os.name == "nt", "install.sh test is POSIX-only; install.ps1 is covered by the CI installer job")
+    @unittest.skipIf(os.name == "nt", "install.sh requires a POSIX shell")
+    def test_installer_reports_missing_release_tag(self) -> None:
+        # The v0.5.1 headline fix: under pipefail an empty tag pipeline used to kill the
+        # script before its own error message; the guard must now actually be reached.
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source"
+            source.mkdir()
+            subprocess.run(["git", "init", "-q", str(source)], check=True)
+            (source / "README.md").write_text("a repository with no release tags\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(source), "add", "README.md"], check=True)
+            subprocess.run(
+                ["git", "-C", str(source), "-c", "user.name=Project Context Tests",
+                 "-c", "user.email=tests@example.invalid", "commit", "-qm", "init"],
+                check=True,
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "install.sh")],
+                capture_output=True,
+                timeout=120,
+                env={
+                    **os.environ,
+                    "PROJECT_CONTEXT_REPO": str(source),
+                    "PROJECT_CONTEXT_HOME": str(Path(temporary) / "home"),
+                    "PROJECT_CONTEXT_VERSION": "",
+                },
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("could not resolve a release tag", result.stderr.decode())
+
+    def test_install_ps1_mirrors_posix_installer_guarantees(self) -> None:
+        # install.ps1 has no automated execution anywhere (Windows CI is deliberately out of
+        # the default pipeline), so its mirror-critical invariants are pinned textually here.
+        posix = (ROOT / "install.sh").read_text(encoding="utf-8")
+        windows = (ROOT / "install.ps1").read_text(encoding="utf-8")
+        # Both installers report the two tag-resolution failures distinctly.
+        for message in ("could not reach", "could not resolve a release tag"):
+            self.assertIn(message, posix)
+            self.assertIn(message, windows)
+        # Both extend PATH with the per-user bin directory BEFORE the first jCodeMunch
+        # lookup, and honour PROJECT_CONTEXT_HOME rather than hardcoding $HOME there.
+        self.assertLess(posix.index('export PATH="$HOME_DIR/.local/bin'), posix.index("command -v jcodemunch-mcp"))
+        self.assertLess(windows.index('Join-Path $HomeDir ".local\\bin"'), windows.index("Get-Command jcodemunch-mcp"))
+        self.assertNotIn("$HOME\\.local\\bin", windows)
+
+    @unittest.skipIf(
+        os.name == "nt",
+        "install.sh test is POSIX-only; install.ps1 is never executed by CI (Windows is deliberately "
+        "out of the default pipeline) - its invariants are pinned by the mirror test and RELEASING.md's "
+        "manual Windows check",
+    )
     def test_installer_installs_updates_and_archives_legacy(self) -> None:
         tags = subprocess.run(["git", "-C", str(ROOT), "tag", "-l", "v*"], capture_output=True, text=True)
         if not tags.stdout.strip():

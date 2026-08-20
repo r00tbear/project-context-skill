@@ -326,7 +326,7 @@
       ],
       "expected": [
         "Report the occupied id range before assigning any ADR or MB number",
-        "Ask whether to continue the existing series, offset, or use a distinct prefix, and record the choice as an ADR",
+        "Resolve continue-vs-offset-vs-prefix through the decision matrix: at decide-and-report levels continue the existing series at the next free id and report it, at confirmation levels ask first - recording the choice as its own ADR either way",
         "Report cited-but-undefined ids as a finding-shaped item with citing paths",
         "Block and ask before regenerating a heading for an id that tracked files cite"
       ],

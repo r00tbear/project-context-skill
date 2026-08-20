@@ -39,10 +39,13 @@ PY
 
 version="${PROJECT_CONTEXT_VERSION:-}"
 if [ -z "$version" ]; then
-    version="$(git ls-remote --tags --refs "$REPO_URL" 'v*' \
+    # Two distinct failures, reported separately (and survivable under pipefail):
+    # an unreachable repository, and a reachable one with no release tag.
+    tags="$(git ls-remote --tags --refs "$REPO_URL" 'v*')" || fail "could not reach $REPO_URL"
+    version="$(printf '%s\n' "$tags" \
         | awk -F/ '{print $NF}' \
         | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-        | sort -V | tail -1)"
+        | sort -V | tail -1 || true)"
 fi
 [ -n "$version" ] || fail "could not resolve a release tag from $REPO_URL"
 say "installing release $version"

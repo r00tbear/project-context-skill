@@ -1558,6 +1558,19 @@ def _validated_project(repo: Path) -> dict[str, Any]:
                     f"{governance_path} anchor {anchor} has no matching '## {anchor}: ...' heading "
                     "(the dashboard reads that literal heading shape, in any language)"
                 )
+    # repodocs/ is the manifest-owned generated surface; a file living there that no
+    # manifest entry owns is drift (stale leftover or hand-added document). A warning,
+    # not an error: the file may be legitimate user material pending adoption.
+    repodocs_root = root / "repodocs"
+    if repodocs_root.is_dir() and not _is_symlink_or_junction(repodocs_root):
+        for directory, dirnames, filenames in os.walk(repodocs_root, followlinks=False):
+            dirnames[:] = sorted(d for d in dirnames if not _is_symlink_or_junction(Path(directory) / d))
+            for name in sorted(filenames):
+                if name == ".DS_Store":
+                    continue
+                relative = (Path(directory) / name).relative_to(root).as_posix()
+                if relative not in generated_paths:
+                    warnings.append(f"unmanaged file in repodocs/: {relative} (not owned by the manifest)")
     summary = {
         "status": "valid",
         "artifacts": len(manifest["artifacts"]),
@@ -1577,6 +1590,7 @@ def _validated_project(repo: Path) -> dict[str, Any]:
         "findings": findings_by_auditor,
         "project_map": project_map,
         "wikilinks": wikilink_entries,
+        "generated_paths": generated_paths,
         "summary": summary,
     }
 
@@ -1598,13 +1612,25 @@ def _markdown_sections(text: str, prefix: str | None = None) -> list[dict[str, s
         if prefix and not re.fullmatch(rf"{re.escape(prefix)}-[0-9]{{3,}}", identifier):
             continue
         body: list[str] = []
+        truncated = False
         for candidate in lines[index + 1 :]:
             if candidate.startswith("## "):
                 break
-            if candidate.strip() and not candidate.lstrip().startswith("<!--"):
-                body.append(candidate.strip())
+            stripped = candidate.strip()
+            # HTML anchors sit above the NEXT entry's heading in the canonical layout;
+            # they are navigation markup, not body text, so they neither render nor
+            # count toward the cap (a false "truncated" on every 8-line ADR otherwise).
+            if not stripped or stripped.startswith("<!--") or re.fullmatch(r'<a id="[^"]*"></a>', stripped):
+                continue
+            # The dashboard shows at most 8 body lines per entry; a ninth line means
+            # the source holds more, and silence about that would misrepresent the
+            # entry (e.g. an ADR whose Consequences start on line nine).
             if len(body) == 8:
+                truncated = True
                 break
+            body.append(stripped)
+        if truncated:
+            body.append("… entry truncated here - read the full text in the source document")
         meta = ""
         for line in body:
             found = re.search(r"Priority:\s*([^\s·]+)\s*·\s*Effort:\s*([^\s·]+)\s*·\s*Status:\s*(\S+)", line)
@@ -1637,7 +1663,12 @@ def _snapshot_id(value: dict[str, Any]) -> str:
 _REPODOCS_LINK_RE = re.compile(r"repodocs/[A-Za-z0-9_./-]+\.(?:md|json)(?:#[A-Za-z0-9_-]+)?")
 
 
-def _instruction_view(root: Path, entries: list[dict[str, Any]], markdown: dict[str, str] | None) -> list[dict[str, Any]]:
+def _instruction_view(
+    root: Path,
+    entries: list[dict[str, Any]],
+    markdown: dict[str, str] | None,
+    artifact_paths: set[str] | None = None,
+) -> list[dict[str, Any]]:
     """Read-only enrichment for the dashboard: content preview plus repodocs link status.
     Instruction content is untrusted data; it is shown, never followed or summarised."""
     view: list[dict[str, Any]] = []
@@ -1647,17 +1678,32 @@ def _instruction_view(root: Path, entries: list[dict[str, Any]], markdown: dict[
         try:
             raw = _read_regular(root / entry["path"], entry["path"])
             text = raw[:65536].decode("utf-8", errors="replace")
-            item["preview"] = text[:2000]
+            # Host configuration files (settings, MCP registrations) routinely hold
+            # credentials in values; the dashboard never embeds their content, matching
+            # the audit rule that secrets are reported by location, never by value.
+            # Prose instruction files are Markdown by construction, so anything else that
+            # reaches the map (a JSON/env/script under .cursor/rules/, say) is config too.
+            lowered_path = entry["path"].lower()
+            if lowered_path in _INSTRUCTION_CONFIG_FILES or not lowered_path.endswith((".md", ".mdc")):
+                item["preview"] = ""
+                item["preview_redacted"] = True
+            else:
+                item["preview"] = text[:2000]
             for raw_link in sorted(set(_REPODOCS_LINK_RE.findall(text)))[:30]:
                 target_path, _, fragment = raw_link.partition("#")
                 if markdown is None:
                     status = "unverified"
-                elif target_path not in markdown:
-                    status = "dangling-file"
-                elif fragment and f'<a id="{fragment}"></a>' not in markdown[target_path]:
-                    status = "dangling-anchor"
+                elif target_path in markdown:
+                    if fragment and f'<a id="{fragment}"></a>' not in markdown[target_path]:
+                        status = "dangling-anchor"
+                    else:
+                        status = "resolves"
+                elif artifact_paths is not None and target_path in artifact_paths:
+                    # Manifest-owned non-Markdown artifact (e.g. repodocs/project-map.json):
+                    # the file resolves; anchors only exist in Markdown.
+                    status = "dangling-anchor" if fragment else "resolves"
                 else:
-                    status = "resolves"
+                    status = "dangling-file"
                 links.append({"raw": raw_link, "status": status})
         except ContractError:
             item["preview"] = ""
@@ -1825,7 +1871,9 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         ],
         "limitations": limitations,
     }
-    model["agent_instructions"] = _instruction_view(root, current["agent_instructions"], markdown)
+    model["agent_instructions"] = _instruction_view(
+        root, current["agent_instructions"], markdown, project["generated_paths"]
+    )
     model["agent_instructions_truncated"] = current["agent_instructions_truncated"]
     model["snapshot_id"] = _snapshot_id(model)
     return model
@@ -1863,12 +1911,8 @@ def render_dashboard_html(repo: Path, route: str = "/", nonce: str | None = None
     return template.encode("utf-8")
 
 
-def serve_dashboard(repo: Path, *, open_browser: bool = True) -> None:
-    root = _resolve_existing(repo, "repository path")
-    # Validate the fixed root before opening a socket; requests can never choose another path.
-    preflight(root)
-    token = secrets.token_hex(16)
-    route = f"/{token}/"
+def _dashboard_handler_class(root: Path, route: str) -> type[BaseHTTPRequestHandler]:
+    """The dashboard's HTTP boundary, extracted so tests can exercise it over real sockets."""
 
     class DashboardHandler(BaseHTTPRequestHandler):
         server_version = "ProjectContext/1"
@@ -1961,7 +2005,16 @@ def serve_dashboard(repo: Path, *, open_browser: bool = True) -> None:
 
         do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = do_TRACE = do_CONNECT = _method_not_allowed
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), DashboardHandler)
+    return DashboardHandler
+
+
+def serve_dashboard(repo: Path, *, open_browser: bool = True) -> None:
+    root = _resolve_existing(repo, "repository path")
+    # Validate the fixed root before opening a socket; requests can never choose another path.
+    preflight(root)
+    token = secrets.token_hex(16)
+    route = f"/{token}/"
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _dashboard_handler_class(root, route))
     server.daemon_threads = True
     url = f"http://127.0.0.1:{server.server_port}{route}"
     print(f"Project Context dashboard: {url}", flush=True)
@@ -1989,9 +2042,11 @@ def self_check(skill_root: Path) -> dict[str, Any]:
         "assets/project-context-icon.svg",
         "assets/project-context-logo.svg",
         "scripts/project_context.py",
+        "evals/README.md",
         "evals/cases.json",
         "evals/fixtures/build.sh",
         "evals/scorecard.template.json",
+        "examples/README.md",
         "schemas/findings.schema.json",
         "schemas/project-map.schema.json",
         "examples/PROJECT_CONTEXT.md",
@@ -2017,6 +2072,28 @@ def self_check(skill_root: Path) -> dict[str, Any]:
     for relative in sorted(required):
         if not _decode_text(_read_regular(root / relative, relative), relative).strip():
             raise ContractError(f"skill payload file is empty: {relative}")
+    # The registry is two-way: a payload file that is not registered here would ship
+    # silently (installed, never verified). Sweep the payload directories and reject
+    # unregistered files, skipping only runtime caches.
+    _junk_dirs = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+    unregistered: list[str] = []
+    for payload_dir in ("agents", "assets", "auditors", "evals", "examples", "references", "schemas", "scripts", "templates"):
+        base = root / payload_dir
+        if not base.is_dir():
+            continue
+        for directory, dirnames, filenames in os.walk(base, followlinks=False):
+            dirnames[:] = sorted(d for d in dirnames if d not in _junk_dirs)
+            for name in sorted(filenames):
+                if name == ".DS_Store" or name.endswith((".pyc", ".pyo")):
+                    continue
+                relative = (Path(directory) / name).relative_to(root).as_posix()
+                if relative not in required:
+                    unregistered.append(relative)
+    if unregistered:
+        raise ContractError(
+            "skill payload contains unregistered files (add them to the self-check registry "
+            f"or remove them): {', '.join(sorted(unregistered))}"
+        )
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
         raise ContractError("VERSION must contain x.y.z")

@@ -28,6 +28,12 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: bash -n install.sh
+      # pwsh ships on GitHub-hosted Linux and macOS runners; parse errors fail the job,
+      # so install.ps1 gets real syntax coverage without a Windows runner.
+      - name: Syntax-check install.ps1
+        run: |
+          command -v pwsh >/dev/null || { echo "pwsh not present; skipping"; exit 0; }
+          pwsh -NoProfile -Command '$e = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$null, [ref]$e); if ($e.Count) { $e; exit 1 }'
       - run: python3 scripts/project_context.py self-check --skill-root .
       - run: python3 -m unittest discover -s tests -v
       # Whole-tree whitespace lint (explicit: diff against the empty tree, stable under shallow clones)
