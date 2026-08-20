@@ -27,8 +27,10 @@ ADAPTER_DIR="$HOME_DIR/.claude/skills/project-context"
 BACKUPS="$HOME_DIR/.skill-backups"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
-say()  { printf '\033[1;36m[project-context]\033[0m %s\n' "$*"; }
-fail() { printf '\033[1;31m[project-context] error:\033[0m %s\n' "$*" >&2; exit 1; }
+# Color only when writing to a terminal and NO_COLOR is unset (https://no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then C_INFO='\033[1;36m'; C_ERROR='\033[1;31m'; C_RESET='\033[0m'; else C_INFO=''; C_ERROR=''; C_RESET=''; fi
+say()  { printf "${C_INFO}[project-context]${C_RESET} %s\n" "$*"; }
+fail() { printf "${C_ERROR}[project-context] error:${C_RESET} %s\n" "$*" >&2; exit 1; }
 
 command -v git >/dev/null 2>&1 || fail "git is required. Install git first: https://git-scm.com/downloads"
 command -v python3 >/dev/null 2>&1 || fail "python3 is required. Install Python 3.11+ first: https://www.python.org/downloads/"
@@ -107,7 +109,11 @@ else
     # Register the MCP server with the coding agents found on this machine.
     # Registration failures are not fatal here: the skill's preflight re-checks and
     # prints the same command, so the user is never stuck silently.
-    if jcodemunch-mcp init --client auto --yes </dev/null >/dev/null 2>&1; then
+    # Run init from a scratch directory: it drops agent-instruction files (AGENTS.md,
+    # .windsurfrules, .cursor/rules/) into its CWD, and that must never be the user's
+    # project or the payload clone. The mktemp assignment is guarded: on failure the
+    # condition is false and init never runs from the current directory.
+    if scratch_dir="$(mktemp -d)" && (cd "$scratch_dir" && jcodemunch-mcp init --client auto --yes </dev/null >/dev/null 2>&1); then
         say "registered the jCodeMunch MCP server with your detected agents"
     else
         say "warning: automatic MCP registration failed; run manually: jcodemunch-mcp init --client auto --yes"

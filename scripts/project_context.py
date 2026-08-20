@@ -951,8 +951,13 @@ def _agent_instruction_map(root: Path) -> tuple[list[dict[str, Any]], bool]:
         others_result = _git(root, "ls-files", "-z", "--others", "--exclude-standard")
     except ContractError:
         return [], True
-    tracked = {p for p in tracked_result.stdout.split("\0") if p} if tracked_result.returncode == 0 else set()
-    others = {p for p in others_result.stdout.split("\0") if p} if others_result.returncode == 0 else set()
+    if tracked_result.returncode != 0 or others_result.returncode != 0:
+        # git ran but the listing failed (corrupt index, unreadable object store):
+        # discovery is unknown, not empty - the empty-set fallback would render a
+        # silently partial inventory as verified-clean.
+        return [], True
+    tracked = {p for p in tracked_result.stdout.split("\0") if p}
+    others = {p for p in others_result.stdout.split("\0") if p}
     # Git-ignored instruction files are still loaded by the hosts (ignoring CLAUDE.local.md is
     # the documented recommendation), so they must not hide from the map. The pathspecs bound
     # the listing to instruction basenames - a bare --ignored listing would return node_modules.
@@ -2142,33 +2147,33 @@ def self_check(skill_root: Path) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    command = commands.add_parser("self-check")
+    command = commands.add_parser("self-check", help="verify the installed skill payload (registry, templates, schemas, evals)")
     command.add_argument("--skill-root", type=Path, default=Path(__file__).resolve().parents[1])
-    command = commands.add_parser("preflight")
+    command = commands.add_parser("preflight", help="inspect a repository before an audit: context state, instruction map, citations")
     command.add_argument("--repo", required=True, type=Path)
     command.add_argument("--skill-root", type=Path, default=Path(__file__).resolve().parents[1])
-    command = commands.add_parser("merge-host")
+    command = commands.add_parser("merge-host", help="merge the managed block into a host file; prints the merged text to stdout")
     command.add_argument("--host", required=True, choices=sorted(HOST_FILES))
     command.add_argument("--input", type=Path)
-    command.add_argument("--expected-sha256")
+    command.add_argument("--expected-sha256", help="optimistic lock: abort when the host file changed after preview")
     command.add_argument("--allow-create", action="store_true")
-    command = commands.add_parser("validate-project")
+    command = commands.add_parser("validate-project", help="validate the whole generated context of a repository against the manifest")
     command.add_argument("--repo", required=True, type=Path)
-    command = commands.add_parser("validate-config")
+    command = commands.add_parser("validate-config", help="validate one project-context.config.json document")
     command.add_argument("--input", required=True, type=Path)
-    command = commands.add_parser("validate-findings")
+    command = commands.add_parser("validate-findings", help="validate one auditor findings document, optionally against its predecessor")
     command.add_argument("--input", required=True, type=Path)
     command.add_argument("--previous", type=Path)
     command.add_argument("--previous-sha256", help="expected sha256:<hex> of the previous file's normalized text, from the last valid manifest")
     command.add_argument("--allow-provisional", action="store_true")
-    command = commands.add_parser("validate-inventory")
+    command = commands.add_parser("validate-inventory", help="validate one audit inventory, optionally enforcing append-only history")
     command.add_argument("--input", required=True, type=Path)
     command.add_argument("--previous", type=Path)
-    command = commands.add_parser("validate-project-map")
+    command = commands.add_parser("validate-project-map", help="validate one project-map.json document")
     command.add_argument("--input", required=True, type=Path)
-    command = commands.add_parser("validate-manifest")
+    command = commands.add_parser("validate-manifest", help="validate one project-context.manifest.json document")
     command.add_argument("--input", required=True, type=Path)
-    command = commands.add_parser("dashboard")
+    command = commands.add_parser("dashboard", help="serve the read-only local dashboard for a repository")
     command.add_argument("--repo", required=True, type=Path)
     command.add_argument("--no-open", action="store_true")
     return parser

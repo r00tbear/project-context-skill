@@ -18,6 +18,7 @@ from typing import Any
 from scripts.project_context import (
     HOST_MARKERS,
     ContractError,
+    _agent_instruction_map,
     _dashboard_handler_class,
     _instruction_view,
     _markdown_sections,
@@ -319,10 +320,10 @@ class DocumentValidationTests(unittest.TestCase):
             validate_findings(value)
 
     def test_strip_code_spans_hides_quoted_wikilinks(self) -> None:
-        text = "Real [[context]] link.\nQuoted `[[decisions#ADR-025|ADR-025]]` example.\n```\n[[fenced#Anchor]]\n```\n"
+        text = "Real [[context]] link.\nQuoted `[[decisions#ADR-925|ADR-925]]` example.\n```\n[[fenced#Anchor]]\n```\n"
         stripped = strip_code_spans(text)
         self.assertIn("[[context]]", stripped)
-        self.assertNotIn("ADR-025", stripped)
+        self.assertNotIn("ADR-925", stripped)
         self.assertNotIn("fenced", stripped)
         self.assertNotIn("double", strip_code_spans("Quoted ``[[double#Anchor]]`` example."))
         self.assertNotIn("tilde", strip_code_spans("~~~\n[[tilde#Anchor]]\n~~~\n"))
@@ -1182,13 +1183,13 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "notes.ts").write_text("// per ADR-031 and MB-022\n// see ADR-031 again\n// heap sized 512MB-4GB and a LOADR-9 register are not decision ids\n", encoding="utf-8")
+            (root / "notes.ts").write_text("// per ADR-931 and MB-922\n// see ADR-931 again\n// heap sized 512MB-4GB and a LOADR-9 register are not decision ids\n", encoding="utf-8")
             (root / "repodocs").mkdir()
-            (root / "repodocs/decisions.md").write_text("ADR-099 must not be reported\n", encoding="utf-8")
+            (root / "repodocs/decisions.md").write_text("ADR-909 must not be reported\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
             citations = preflight(root)["decision_citations"]
-            self.assertEqual({"ADR-031", "MB-022"}, {entry["id"] for entry in citations})
-            adr = next(entry for entry in citations if entry["id"] == "ADR-031")
+            self.assertEqual({"ADR-931", "MB-922"}, {entry["id"] for entry in citations})
+            adr = next(entry for entry in citations if entry["id"] == "ADR-931")
             self.assertEqual(["notes.ts"], adr["files"])
 
     def test_preflight_maps_agent_instructions(self) -> None:
@@ -1214,6 +1215,21 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             self.assertIn(".agents/skills/demo/SKILL.md", entries)
             self.assertNotIn(".agents/skills/demo/reference/deep.md", entries)
             self.assertIn("modified", entries["AGENTS.md"])
+
+    def test_instruction_map_flags_failed_git_listing_as_unknown(self) -> None:
+        # git runs but the listing fails (corrupt index): discovery must report
+        # empty + truncated - the "unknown, not verified empty" signal the dashboard
+        # renders as a failure state - never a silently partial inventory.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "AGENTS.md").write_text("instructions\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "AGENTS.md"], check=True)
+            entries, truncated = _agent_instruction_map(root)
+            self.assertEqual(["AGENTS.md"], [entry["path"] for entry in entries])
+            (root / ".git/index").write_bytes(b"garbage: not a git index")
+            entries, truncated = _agent_instruction_map(root)
+            self.assertEqual(([], True), (entries, truncated))
 
     def test_instruction_map_sees_git_ignored_instruction_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1601,16 +1617,24 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("Manifest-owned validated artifact.", explorer_source)
         self.assertNotIn('renderMap(byId("context-map-panel")', source)
 
+    def test_instruction_map_empty_state_distinguishes_failure_from_clean(self) -> None:
+        # A failed discovery (empty list + truncated flag) must never render as a
+        # verified-clean inventory; the guard has to run before the clean empty state.
+        source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
+        instructions_source = source.split("function renderInstructions", 1)[1].split("function renderHistory", 1)[0]
+        failure_index = instructions_source.index("Instruction discovery could not complete")
+        clean_index = instructions_source.index("No agent instruction files found")
+        self.assertLess(instructions_source.index("agent_instructions_truncated === true"), clean_index)
+        self.assertLess(failure_index, clean_index)
+        self.assertIn("not verified empty", instructions_source)
+
     def test_findings_ai_prompt_has_safe_state_aware_lifecycle_contract(self) -> None:
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
-        prompt_source = source.split("function remediationPrompt", 1)[1].split("function findingSearchText", 1)[0]
+        prompt_source = source.split("function promptMode", 1)[1].split("function findingSearchText", 1)[0]
+        # Prompt-contract tokens are asserted against the sliced prompt builders, so a
+        # token drifting OUT of the prompt functions fails even if it survives
+        # elsewhere in the page; page-chrome tokens are asserted against the file.
         for token in (
-            '<th class="ai-prompt-cell" scope="col">AI Prompt</th>',
-            'kind: "recheck"',
-            'kind: "fix"',
-            'kind: "resolved"',
-            'kind: "refuted"',
-            ".finding-details > summary",
             "STOP: this snapshot is stale or its freshness is unknown",
             "Keep this historical id refuted forever",
             "a comparable re-audit may return this resolved id to persisting",
@@ -1626,6 +1650,20 @@ class DashboardTests(unittest.TestCase):
             "A fresh read-only agent must perform blind verification",
             "findings, trace ledger, decision rationale",
             "write the manifest last",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, prompt_source)
+        for token in (
+            'kind: "recheck"',
+            'kind: "fix"',
+            'kind: "resolved"',
+            'kind: "refuted"',
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, prompt_source)
+        for token in (
+            '<th class="ai-prompt-cell" scope="col">AI Prompt</th>',
+            ".finding-details > summary",
             "navigator.clipboard.writeText(prompt)",
             "field.select()",
             "search: findingSearchText(finding)",
@@ -1759,12 +1797,12 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("\\u003c/script\\u003e", html)
 
     def test_markdown_sections_mark_truncated_bodies_explicitly(self) -> None:
-        long_entry = "## ADR-100: Long\n" + "\n".join(f"- body line {index}" for index in range(10)) + "\n"
+        long_entry = "## ADR-901: Long\n" + "\n".join(f"- body line {index}" for index in range(10)) + "\n"
         sections = _markdown_sections(long_entry, "ADR")
         self.assertEqual(9, len(sections[0]["lines"]))
         self.assertTrue(sections[0]["lines"][-1].startswith("…"))
         self.assertIn("truncated", sections[0]["lines"][-1])
-        exact_entry = "## ADR-101: Exact\n" + "\n".join(f"- body line {index}" for index in range(8)) + "\n"
+        exact_entry = "## ADR-902: Exact\n" + "\n".join(f"- body line {index}" for index in range(8)) + "\n"
         sections = _markdown_sections(exact_entry, "ADR")
         self.assertEqual(8, len(sections[0]["lines"]))
         self.assertFalse(any("truncated" in line for line in sections[0]["lines"]))
@@ -1774,12 +1812,12 @@ class DashboardTests(unittest.TestCase):
         # an 8-line entry followed by an anchor must not read as truncated, and the
         # anchor must never surface as body text of the previous entry.
         canonical = (
-            '<a id="ADR-100"></a>\n## ADR-100: First\n'
+            '<a id="ADR-901"></a>\n## ADR-901: First\n'
             + "\n".join(f"- bullet {index}" for index in range(8))
-            + '\n\n<a id="ADR-101"></a>\n## ADR-101: Second\n- short body\n'
+            + '\n\n<a id="ADR-902"></a>\n## ADR-902: Second\n- short body\n'
         )
         sections = _markdown_sections(canonical, "ADR")
-        self.assertEqual(["ADR-100", "ADR-101"], [section["id"] for section in sections])
+        self.assertEqual(["ADR-901", "ADR-902"], [section["id"] for section in sections])
         self.assertEqual(8, len(sections[0]["lines"]))
         self.assertFalse(any("truncated" in line for line in sections[0]["lines"]))
         self.assertNotIn("<a id=", sections[0]["summary"])
@@ -2008,6 +2046,23 @@ class CliTests(unittest.TestCase):
         self.assertLess(posix.index('export PATH="$HOME_DIR/.local/bin'), posix.index("command -v jcodemunch-mcp"))
         self.assertLess(windows.index('Join-Path $HomeDir ".local\\bin"'), windows.index("Get-Command jcodemunch-mcp"))
         self.assertNotIn("$HOME\\.local\\bin", windows)
+        # jcodemunch-mcp init drops agent-instruction files into its CWD; both installers
+        # must run it from a scratch directory, never the user's project or the payload.
+        self.assertLess(posix.index('(cd "$scratch_dir"'), posix.index("jcodemunch-mcp init"))
+        self.assertLess(windows.index("Push-Location $InitDir"), windows.index("jcodemunch-mcp init"))
+        # Every stderr-silenced native call is scoped through Quiet, or PowerShell 5.1
+        # can raise NativeCommandError before a $LASTEXITCODE guard runs. Pin BOTH the
+        # single redirect and the scope swap inside the helper body - a Quiet without
+        # the ErrorActionPreference swap would restore the hazard while keeping count.
+        self.assertEqual(1, windows.count("2>$null"), "bare 2>$null outside the Quiet helper")
+        quiet_body = windows.split("function Quiet", 1)[1].split("$RepoUrl", 1)[0]
+        self.assertIn('$ErrorActionPreference = "Continue"', quiet_body)
+        self.assertIn("finally", quiet_body)
+        # Errors reach the error stream on both platforms; the mktemp scratch dir is
+        # guarded so a failed mktemp can never leave init running in the user's cwd.
+        self.assertIn('>&2', posix)
+        self.assertIn("$Host.UI.WriteErrorLine", windows)
+        self.assertIn('if scratch_dir="$(mktemp -d)" && (cd "$scratch_dir"', posix)
 
     @unittest.skipIf(
         os.name == "nt",

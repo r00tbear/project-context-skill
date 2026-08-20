@@ -13,7 +13,17 @@
 $ErrorActionPreference = "Stop"
 
 function Say($Message) { Write-Host "[project-context] $Message" -ForegroundColor Cyan }
-function Fail($Message) { Write-Host "[project-context] error: $Message" -ForegroundColor Red; exit 1 }
+# Errors go to the host's error surface, which the console host routes to stderr
+# (mirrors install.sh's >&2) and custom hosts (ISE, VS Code) still display.
+function Fail($Message) { $Host.UI.WriteErrorLine("[project-context] error: $Message"); exit 1 }
+# Under ErrorActionPreference=Stop, Windows PowerShell 5.1 can raise NativeCommandError
+# when a native command writes to a redirected stderr - BEFORE any $LASTEXITCODE guard
+# runs. Every stderr-silenced native call goes through this scope-limited wrapper.
+function Quiet([scriptblock]$Command) {
+    $Previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & $Command 2>$null } finally { $ErrorActionPreference = $Previous }
+}
 
 $RepoUrl = if ($env:PROJECT_CONTEXT_REPO) { $env:PROJECT_CONTEXT_REPO } else { "https://github.com/r00tbear/project-context-skill.git" }
 $HomeDir = if ($env:PROJECT_CONTEXT_HOME) { $env:PROJECT_CONTEXT_HOME } else { $HOME }
@@ -29,7 +39,7 @@ $Python = $null
 foreach ($Candidate in @("python3", "python", "py")) {
     $Found = Get-Command $Candidate -ErrorAction SilentlyContinue
     if ($Found) {
-        & $Found.Source -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>$null
+        Quiet { & $Found.Source -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" }
         if ($LASTEXITCODE -eq 0) { $Python = $Found.Source; break }
     }
 }
@@ -37,7 +47,7 @@ if (-not $Python) { Fail "Python 3.11+ is required. Install it first: https://ww
 
 $Version = $env:PROJECT_CONTEXT_VERSION
 if (-not $Version) {
-    $Tags = git ls-remote --tags --refs $RepoUrl "v*" 2>$null
+    $Tags = Quiet { git ls-remote --tags --refs $RepoUrl "v*" }
     if ($LASTEXITCODE -ne 0) { Fail "could not reach $RepoUrl" }
     $Version = $Tags |
         ForEach-Object { ($_ -split "/")[-1] } |
@@ -62,7 +72,7 @@ if (Test-Path $LegacyCodex) {
 }
 
 if (Test-Path (Join-Path $Payload ".git")) {
-    $Origin = git -C $Payload remote get-url origin 2>$null
+    $Origin = Quiet { git -C $Payload remote get-url origin }
     if ($Origin -notlike "*project-context-skill*") {
         Fail "$Payload exists but is not a project-context clone (origin: $Origin). Move it aside and re-run."
     }
@@ -75,7 +85,7 @@ if (Test-Path (Join-Path $Payload ".git")) {
     Fail "$Payload exists and is not a git clone. Move it aside and re-run."
 } else {
     New-Item -ItemType Directory -Force -Path (Split-Path $Payload) | Out-Null
-    git -c advice.detachedHead=false clone --quiet --branch $Version --depth 1 $RepoUrl $Payload 2>$null
+    Quiet { git -c advice.detachedHead=false clone --quiet --branch $Version --depth 1 $RepoUrl $Payload }
     if ($LASTEXITCODE -ne 0) {
         git -c advice.detachedHead=false clone --quiet --branch $Version $RepoUrl $Payload
         if ($LASTEXITCODE -ne 0) { Fail "git clone failed" }
@@ -108,12 +118,24 @@ if ($env:PROJECT_CONTEXT_NO_JCODEMUNCH -eq "1") {
     if (-not (Get-Command jcodemunch-mcp -ErrorAction SilentlyContinue)) {
         Fail "jcodemunch-mcp installed but not on PATH; open a new terminal and re-run this installer."
     }
-    $JVersion = jcodemunch-mcp --version 2>$null
+    $JVersion = Quiet { jcodemunch-mcp --version }
     Say "jCodeMunch $JVersion"
     # Registration failures are not fatal: the skill's preflight re-checks and prints
     # the same command, so the user is never stuck silently.
-    jcodemunch-mcp init --client auto --yes 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    # Run init from a scratch directory: it drops agent-instruction files (AGENTS.md,
+    # .windsurfrules, .cursor/rules/) into its CWD, and that must never be the user's
+    # project or the payload clone.
+    $InitDir = Join-Path ([System.IO.Path]::GetTempPath()) ("project-context-init-" + [System.Guid]::NewGuid())
+    $InitRan = $false
+    try {
+        New-Item -ItemType Directory -Force -Path $InitDir | Out-Null
+        Push-Location $InitDir
+        try { Quiet { jcodemunch-mcp init --client auto --yes } | Out-Null; $InitRan = $true } finally { Pop-Location }
+    } catch {
+        # A temp-dir failure mirrors install.sh: registration degrades to a warning,
+        # it never aborts the install and never runs init from the user's directory.
+    }
+    if ($InitRan -and $LASTEXITCODE -eq 0) {
         Say "registered the jCodeMunch MCP server with your detected agents"
     } else {
         Say "warning: automatic MCP registration failed; run manually: jcodemunch-mcp init --client auto --yes"

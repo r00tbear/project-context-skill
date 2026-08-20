@@ -6,6 +6,42 @@ enforces this by `(major, minor)` of the recorded skill version: a patch delta i
 warning, a minor/major delta reports `context_state: invalid` until the audit is re-run.
 Before v0.5.0 the check was strict: any version delta invalidated the context.
 
+## v0.5.2
+
+**Regeneration required: no** (patch: verification-process calibration, installer
+hardening and polish; generated document shapes and validity rules are unchanged).
+
+Everything below comes from the v0.5.1 dogfood run - which ended, by design, in an
+honest `verification.blind: failed` at the eight-pass hard bound and thereby proved
+the bound works while exposing that the stopping rule itself needed calibration:
+
+- Blind-verification stopping rule recalibrated: issues are now classified as
+  contradictions (the docs assert something the repository contradicts) versus
+  omissions (something true is absent). A run stops clean at zero blocking issues and
+  zero important contradictions; important omissions from the final pass are recorded
+  and dispositioned into the backlog instead of restarting the loop - contradictions
+  converge, open-ended completeness does not. The eight-pass hard bound and the
+  honest `failed` at the cap stay. The blind-verification eval case now pins both.
+- `jcodemunch-mcp init` now runs from a scratch directory in both installers: it
+  drops agent-instruction files (`AGENTS.md`, `.windsurfrules`, `.cursor/rules/`)
+  into its working directory, which previously meant the user's current project.
+- install.ps1: every stderr-silenced native call is scoped through a `Quiet` wrapper,
+  closing a Windows PowerShell 5.1 hazard where `2>$null` under
+  `$ErrorActionPreference=Stop` could raise NativeCommandError before the
+  `$LASTEXITCODE` guard ran (found by the dogfood's adversarial verifier); errors now
+  go to stderr, mirroring install.sh.
+- install.sh honours `NO_COLOR` and only emits ANSI colour on a terminal.
+- The dashboard's instruction map now distinguishes "discovery failed - inventory
+  unknown" from "verified: no instruction files", instead of rendering a total
+  discovery failure as a confident clean result.
+- Every CLI subcommand carries a `--help` description.
+- Test-fixture decision ids moved to a reserved 9xx range after the dogfood's series
+  choice collided with three fixture citations sitting at realistic ids. Canonical
+  low-id examples in templates and examples remain by design - preflight still
+  reports them as occupied, which is exactly what the occupied-series rule is for.
+- Prompt-contract tests now assert prompt tokens against the sliced prompt builders
+  rather than the whole asset, so a token drifting out of the prompt functions fails.
+
 ## v0.5.1
 
 **Regeneration required: no** (patch: installer, dashboard and validator-side fixes;

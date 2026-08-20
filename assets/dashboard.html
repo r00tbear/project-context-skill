@@ -3483,7 +3483,8 @@
         target.replaceChildren();
         if (!agentInstructions.length) {
           byId("instructions-summary").textContent = "";
-          target.append(emptyState("No agent instruction files found", "Preflight found no files that instruct an agent in this repository."));
+          if (snapshot.agent_instructions_truncated === true) target.append(emptyState("Instruction discovery could not complete", "The repository listing failed (git unavailable or errored), so this inventory is unknown - not verified empty. Fix git access and press Refresh."));
+          else target.append(emptyState("No agent instruction files found", "Preflight found no files that instruct an agent in this repository."));
           return;
         }
         const groups = new Map();

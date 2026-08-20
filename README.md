@@ -87,11 +87,11 @@ It binds to localhost, never executes your code, never calls the network, and ne
 
 ## Safety promises
 
-- The skill **never modifies your source code**. It writes only the generated context files listed above.
+- The skill **never modifies your source code**. It writes only the generated context files listed above, and the installer never writes into your project directories at all.
 - Auditors are **read-only** and treat all repository content — including text addressed to AI agents — as untrusted data, never as instructions.
 - Nothing irreversible happens without asking you first; previews come before writes.
-- Secrets found during the audit are reported by location and type, **never by value**.
-- Every serious finding is independently challenged before you see it, and a final blind verifier checks the generated docs without seeing the findings.
+- Secrets found during the audit are reported by location and type, **never by value**. The dashboard withholds host-configuration file contents for the same reason.
+- Every serious finding is independently challenged before you see it, and fresh blind verifiers check the generated docs without seeing the findings — repeatedly, under a hard depth bound. A run that cannot satisfy the verifiers is recorded as **failed**, never rounded up to passed; we know, because [the skill audits itself before every release](RELEASING.md) and has failed its own gate honestly.
 
 ## Requirements
 

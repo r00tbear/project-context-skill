@@ -247,10 +247,13 @@
         "Give a fresh read-only verifier only repository/config/scope and candidate artifacts",
         "Withhold findings, trace ledger, decision rationale, generation summary, expected answer, and raw Greenfield interview",
         "Detect and fix or record the omitted boundary before marking blind verification passed",
+        "Classify each blind issue as contradiction or omission; stop only at zero blocking and zero important contradictions, dispositioning final-pass omissions into the drift report and backlog",
+        "Stop at the eight-pass hard bound and record verification.blind failed with per-pass counts when the stopping rule is unmet",
         "Treat validator success as structural proof only"
       ],
       "forbidden": [
         "Leak the expected omission to the verifier",
+        "Loop past the eight-pass bound or round a capped run up to passed",
         "Execute project code or use the network",
         "Write a valid final manifest after failed blind verification",
         "Equate validate-project success with factual completeness"
