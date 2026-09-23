@@ -1757,9 +1757,9 @@ class DashboardTests(unittest.TestCase):
                 )
                 if expected == "stale":
                     self._commit_source(root, "changed\n")
-                self.assertEqual(
-                    expected, dashboard_snapshot(root)["project"]["revision_state"]
-                )
+                snapshot = dashboard_snapshot(root)
+                self.assertEqual(expected, snapshot["project"]["revision_state"])
+                self.assertEqual(str(root.resolve()), snapshot["project"]["root"])
 
     def test_snapshot_marks_user_host_edits_stale(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2151,6 +2151,31 @@ class DashboardTests(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, prompt_source)
         self.assertNotIn(".finding-details summary", source)
+
+    def test_audit_rerun_prompt_uses_selected_or_fresh_required_scope(self) -> None:
+        source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
+        prompt_source = source.split("function auditRerunPrompt", 1)[1].split(
+            "function updateAuditPromptControl", 1
+        )[0]
+        for token in (
+            "repository_root: asText(project.root)",
+            'requested_auditors: auditor ? [auditor] : "all-applicable"',
+            "compare it with repository_root above; stop if they differ",
+            "run every auditor required by fresh preflight",
+            "Reuse untouched prior results only when inventory v3 provenance, scope, and source hashes allow it",
+            "Never call a partial scan complete",
+            "--previous with --previous-sha256",
+            "Preserve existing policy documents, context-run binding, and host blocks",
+            "Do not generate or wire context",
+            "write the manifest last",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, prompt_source)
+        self.assertNotIn("finding.title", prompt_source)
+        self.assertIn('id="copy-audit-prompt"', source)
+        self.assertIn('id="audit-prompt-preview"', source)
+        self.assertIn("...asArray(asObject(latestAudit.coverage).required)", source)
+        self.assertIn('byId("audit-prompt-text").value = ""', source)
 
     def test_findings_master_prompt_binds_selected_active_snapshot_safely(self) -> None:
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")

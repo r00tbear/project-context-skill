@@ -3319,6 +3319,7 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         "generated_at": generated_at,
         "project": {
             "name": root.name,
+            "root": str(root),
             "revision": current["revision"],
             "short_revision": current["revision"][:8] if current["revision"] else None,
             "worktree_clean": current["worktree_clean"],
