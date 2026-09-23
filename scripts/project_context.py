@@ -3888,11 +3888,8 @@ def preview_context(
 ) -> dict[str, Any]:
     project = _validated_project(repo)
     latest = project["latest_run"]
-    if (
-        latest["source_state"] != "codebase"
-        or latest["verification"]["blind"] != "passed"
-    ):
-        raise ContractError("context preview requires a verified codebase audit")
+    if latest["source_state"] != "codebase":
+        raise ContractError("greenfield audit cannot preview connected context")
     candidate = _resolve_existing(candidate_dir, "candidate directory")
     if not candidate.is_dir():
         raise ContractError("candidate must be a directory")

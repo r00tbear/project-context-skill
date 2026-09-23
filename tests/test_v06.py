@@ -310,17 +310,7 @@ class V06Tests(unittest.TestCase):
             base = Path(directory)
             root, candidate = base / "repo", base / "candidate"
             root.mkdir()
-            inventory, manifest = fixture(root)
-            inventory["runs"][0]["verification"]["blind"] = "passed"
-            write_json(root / "repodocs/audit/inventory.json", inventory)
-            next(
-                item
-                for item in manifest["artifacts"]
-                if item["id"] == "audit_inventory"
-            )["sha256"] = sha256_text(
-                (root / "repodocs/audit/inventory.json").read_text()
-            )
-            write_json(root / "repodocs/project-context.manifest.json", manifest)
+            inventory, _ = fixture(root)
             decisions = candidate / "repodocs/decisions.md"
             decisions.parent.mkdir(parents=True)
             decisions.write_text(
@@ -551,6 +541,7 @@ class V06Tests(unittest.TestCase):
             self.assertEqual(
                 inventory["runs"][0]["id"], validate_project(root)["context_run_id"]
             )
+            self.assertEqual("current", drift(root)["status"])
             self.assertEqual(
                 run["id"], dashboard_snapshot(root)["audit"]["latest"]["id"]
             )
