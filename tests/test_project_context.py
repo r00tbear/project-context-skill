@@ -1373,6 +1373,24 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
                 outside.unlink()
 
     @requires_symlinks
+    def test_preflight_does_not_walk_symlinked_repodocs_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "repo"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            outside = base / "outside"
+            findings = outside / "audit/findings"
+            findings.mkdir(parents=True)
+            (findings / "private.yaml").write_text("secret\n", encoding="utf-8")
+            (root / "repodocs").symlink_to(outside, target_is_directory=True)
+            result = preflight(root)
+            self.assertTrue(
+                any(item["path"] == "repodocs" for item in result["host_errors"])
+            )
+            self.assertNotIn("private.yaml", str(result))
+
+    @requires_symlinks
     def test_preflight_reports_broken_host_file_structurally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

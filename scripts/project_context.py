@@ -1970,7 +1970,7 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
                     {"path": relative, "error": str(exc).replace(str(root), "<repo>")}
                 )
     repodocs = root / "repodocs"
-    if repodocs.exists():
+    if os.path.lexists(repodocs) and not _is_symlink_or_junction(repodocs):
         if not repodocs.is_dir():
             host_errors.append(
                 {"path": "repodocs", "error": "repodocs must be a directory"}
@@ -2028,7 +2028,12 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         if name in root_entries
     )
     findings_dir = root / "repodocs/audit/findings"
-    if findings_dir.is_dir():
+    try:
+        safe_path(root, "repodocs/audit/findings", must_exist=True)
+        safe_findings_dir = findings_dir.is_dir()
+    except ContractError:
+        safe_findings_dir = False
+    if safe_findings_dir:
         legacy.extend(
             sorted(
                 path.relative_to(root).as_posix()
@@ -2657,7 +2662,8 @@ def _validated_project_v2(
     if inventory["schema_version"] != 3:
         raise ContractError("manifest v2 requires inventory v3")
     latest = inventory["runs"][-1]
-    run_ids = {run["id"] for run in inventory["runs"]}
+    runs_by_id = {run["id"]: run for run in inventory["runs"]}
+    run_ids = set(runs_by_id)
     generated_paths = {
         CONFIG_PATH,
         MANIFEST_PATH,
@@ -2941,6 +2947,27 @@ def _validated_project_v2(
                     raise ContractError(
                         f"section provenance has unknown run: {section['source_run_id']}"
                     )
+                source_run = runs_by_id[section["source_run_id"]]
+                source_hashes = {
+                    source["path"]: source["sha256"]
+                    for source in source_run["source_tree"]
+                }
+                for source in section["sources"]:
+                    path = source["path"]
+                    if (
+                        source_hashes.get(path) != source["sha256"]
+                        or not _covered_by(path, source_run["scope"]["included"])
+                        or _covered_by(
+                            path,
+                            [
+                                *source_run["scope"]["excluded"],
+                                *source_run["scope"]["unscanned"],
+                            ],
+                        )
+                    ):
+                        raise ContractError(
+                            f"section source differs from its audit run: {artifact['path']} ({path})"
+                        )
         ids_by_path = {
             artifact["path"]: artifact_id for artifact_id, artifact in artifacts.items()
         }

@@ -11,7 +11,7 @@ Before v0.5.0 the check was strict: any version delta invalidated the context.
 **Regeneration required: yes** (manifest v2, inventory v3, findings v3). Archive the v0.5.x surface with `archive-legacy`, then start a new audit series. Confirmed decisions can seed regeneration; source-cited ADR/MB headings are reserved.
 
 - Audits save a report, findings and coverage without generating policy or connecting hosts. A later audit preserves the active context's verified run link.
-- Per-auditor current/reused results retain source hashes, scope and run IDs. Audit completeness and document verification are independent. `drift --repo` compares working-tree bytes and flags unknown impact from added paths.
+- Per-auditor current/reused results retain source hashes, scope and run IDs against a full source-tree baseline. Policy sections must match their original run's source hashes. Audit completeness and document verification are independent. `drift --repo` compares working-tree bytes and flags unknown impact from added or unlinked changed paths.
 - Findings v3 include a verifiable fix brief. Remediation prompts bind selected identities to the complete active count/hash; `validate-remediation` checks that binding. The dashboard forms explicit groups of up to 250.
 - Context Explorer shows up to 64 KiB of manifest-owned document text as text. Task briefs, deferred-review dates, exact context diff previews and narrow-screen controls are available locally.
 

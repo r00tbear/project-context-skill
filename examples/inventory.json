@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "runs": [
     {
       "id": "audit-20260802T120000Z-example",
@@ -7,11 +7,11 @@
       "revision": null,
       "worktree_clean": null,
       "source_state": "codebase",
-      "outcome": "complete",
+      "outcome": "coverage-incomplete",
       "domains": {"ui": "absent", "data": "absent"},
       "coverage": {
         "required": ["stack", "architecture", "bloat", "security", "testing"],
-        "completed": ["stack", "architecture", "bloat", "security", "testing"],
+        "completed": [],
         "skipped": {
           "ui": "No user-facing interactive surface was found.",
           "data": "No persisted state or externally shared data contract was found."
@@ -23,8 +23,10 @@
         "excluded": ["repodocs"],
         "unscanned": []
       },
+      "source_tree": [{"path": "src/example.py", "sha256": "sha256:33bd629c348b5f698f70eb82f6bd857884464703171175f922980909cd63f584"}],
       "tools": {"jcodemunch": "used"},
-      "verification": {"blind": "passed", "issues": 0}
+      "verification": {"blind": "not-run", "issues": 0},
+      "results": {}
     }
   ]
 }

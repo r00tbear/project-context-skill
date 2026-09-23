@@ -258,6 +258,14 @@ class V06Tests(unittest.TestCase):
             section["sources"] = []
             with self.assertRaisesRegex(ContractError, "hash every covered path"):
                 validate_manifest(manifest)
+            section["sources"] = [
+                {"path": "src/main.py", "sha256": sha256_bytes(b"wrong source")}
+            ]
+            write_json(root / "repodocs/project-context.manifest.json", manifest)
+            with self.assertRaisesRegex(
+                ContractError, "section source differs from its audit run"
+            ):
+                validate_project(root)
 
     def test_context_document_preview_is_bounded_and_hosts_are_withheld(self):
         with tempfile.TemporaryDirectory() as directory:
