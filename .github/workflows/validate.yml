@@ -101,7 +101,12 @@ jobs:
           $adapterParent = Join-Path $env:PROJECT_CONTEXT_HOME '.claude\skills'
           New-Item -ItemType Directory -Force $adapterParent | Out-Null
           New-Item -ItemType Junction -Path (Join-Path $adapterParent 'project-context') -Target $outside | Out-Null
+          $priorPreference = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
           & ${{ matrix.powershell }} -NoProfile -File install.ps1 2>$null
-          if ($LASTEXITCODE -eq 0) { throw 'installer accepted a junction' }
+          $junctionExit = $LASTEXITCODE
+          $ErrorActionPreference = $priorPreference
+          if ($junctionExit -eq 0) { throw 'installer accepted a junction' }
+          $global:LASTEXITCODE = 0
           if ((Get-Content -LiteralPath (Join-Path $outside 'SKILL.md') -Raw).Trim() -ne 'canary') { throw 'outside canary changed' }
           if (Test-Path (Join-Path $env:PROJECT_CONTEXT_HOME '.agents\skills\project-context')) { throw 'payload written before preflight failure' }
