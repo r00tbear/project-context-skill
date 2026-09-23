@@ -784,6 +784,7 @@
       margin: 0 0 12px;
     }
     .finding-selection-summary { min-width: 0; margin-right: auto; color: var(--ink-muted); font-size: 12px; }
+    .select-visible-control { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--ink); cursor: pointer; font-size: 13px; }
     .finding-selection-count { display: block; color: var(--ink); font-weight: 750; }
     .clear-selection-button { padding: 0 12px; background: var(--surface-muted); font-size: 12px; font-weight: 700; }
     .master-prompt-button {
@@ -1250,6 +1251,7 @@
       <p class="filter-result"><output id="finding-count" aria-live="polite">0 findings</output></p>
       <div class="finding-selection-actions">
         <div class="finding-selection-summary" id="master-prompt-scope">
+          <label class="select-visible-control"><input id="select-visible-findings" type="checkbox" aria-label="No selectable active findings shown" disabled><span>Select shown active findings</span></label>
           <span class="finding-selection-count" id="finding-selection-count">0 selected</span>
           <span id="finding-selection-help">Select active findings. Select-all affects shown active findings; hidden selections stay selected.</span>
         </div>
@@ -1266,7 +1268,7 @@
           <caption class="sr-only">Validated project findings</caption>
           <thead>
             <tr>
-              <th class="selection-cell" scope="col"><label class="selection-control"><input id="select-visible-findings" type="checkbox" aria-label="No selectable active findings shown" disabled><span class="sr-only">Select shown active findings</span></label></th>
+              <th class="selection-cell" scope="col"><span class="sr-only">Select</span></th>
               <th scope="col">Severity</th>
               <th scope="col">Finding</th>
               <th class="ai-prompt-cell" scope="col">AI Prompt</th>
@@ -1602,6 +1604,7 @@
         const artifactPath = findingArtifactPath(finding);
         const data = {
           prompt_contract: "project-context-remediation-v2",
+          selection_kind: mode.kind === "resolved" || mode.kind === "refuted" ? "regression" : "remediation",
           repository: {
             current_revision: asText(project.revision),
             audited_revision: asText(latestAudit.revision),
@@ -1673,7 +1676,7 @@
           "",
           "Validation commands (replace placeholders with real paths)",
           "Repeat validate-findings once for every auditor listed completed in the candidate run.",
-          "python3 <skill-root>/scripts/project_context.py validate-remediation --repo <repo> --input <binding.json>",
+          ...(mode.kind === "recheck" ? [] : ["python3 <skill-root>/scripts/project_context.py validate-remediation --repo <repo> --input <binding.json>"]),
           "python3 <skill-root>/scripts/project_context.py validate-findings --input <candidate-findings.json> --previous <saved-previous-findings.json> --previous-sha256 <hash-from-last-valid-manifest>",
           "python3 <skill-root>/scripts/project_context.py validate-inventory --input <candidate-inventory.json> --previous <saved-previous-inventory.json>",
           "python3 <skill-root>/scripts/project_context.py validate-project-map --input <candidate-project-map.json>",
@@ -2197,7 +2200,8 @@
         if (latestAudit.outcome && latestAudit.outcome !== "complete") systemAttention.push({kind: "integrity", runLevel: true, id: "COVERAGE", title: "Audit coverage is incomplete", detail: `Latest outcome: ${titleCase(latestAudit.outcome)}.`, href: "#history"});
         const sourceDrift = asObject(snapshot.drift);
         if (asArray(sourceDrift.changed).length || asArray(sourceDrift.missing).length) systemAttention.push({kind: "integrity", runLevel: true, id: "SOURCE DRIFT", title: "Audited source changed", detail: `${asArray(sourceDrift.changed).length} changed · ${asArray(sourceDrift.missing).length} missing; affected auditors: ${asArray(sourceDrift.affected_auditors).join(", ") || "unknown"}.`, href: "#integrity"});
-        if (asArray(sourceDrift.added_unknown_impact).length) systemAttention.push({kind: "integrity", runLevel: true, id: "UNKNOWN IMPACT", title: "New paths outside known source links", detail: asArray(sourceDrift.added_unknown_impact).slice(0, 4).join(", ") + " — ask the agent to assess impact on the next refresh.", href: "#integrity"});
+        const unknownImpact = [...asArray(sourceDrift.added_unknown_impact), ...asArray(sourceDrift.changed_unknown_impact)];
+        if (unknownImpact.length) systemAttention.push({kind: "integrity", runLevel: true, id: "UNKNOWN IMPACT", title: "Changed paths outside known source links", detail: unknownImpact.slice(0, 4).join(", ") + " — ask the agent to assess impact on the next refresh.", href: "#integrity"});
         if (asArray(sourceDrift.affected_sections).length) systemAttention.push({kind: "integrity", runLevel: true, id: "CONTEXT DRIFT", title: "Context source sections changed", detail: `${asArray(sourceDrift.affected_sections).length} section(s) need review; connected policy remains bound to its verified run.`, href: "#context-map"});
         const unscanned = asArray(asObject(latestAudit.scope).unscanned);
         if (unscanned.length) systemAttention.push({kind: "integrity", runLevel: true, id: "SCOPE", title: "Unscanned scope remains", detail: `${unscanned.length} path${unscanned.length === 1 ? "" : "s"} were not scanned.`, href: "#history"});

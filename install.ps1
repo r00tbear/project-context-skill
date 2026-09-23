@@ -51,6 +51,7 @@ $AdapterDir = Join-Path $HomeDir ".claude\skills\project-context"
 $Backups = Join-Path $HomeDir ".skill-backups"
 $Stamp = (Get-Date -Format "yyyyMMdd-HHmmss") + "-$PID"
 $LegacyCodex = Join-Path $HomeDir ".codex\skills\project-context"
+$AdapterBackup = Join-Path $AdapterDir (".SKILL.md." + $Stamp + ".bak")
 $ClaudeBackup = Join-Path $Backups "claude-project-context-$Stamp"
 $CodexBackup = Join-Path $Backups "codex-project-context-$Stamp"
 
@@ -81,10 +82,11 @@ if (-not $Version) { Fail "could not resolve a release tag from $RepoUrl" }
 Say "installing release $Version"
 
 foreach ($Path in @($Payload, (Join-Path $Payload ".git"), $AdapterDir,
-    (Join-Path $AdapterDir "SKILL.md"), $Backups, $ClaudeBackup, $CodexBackup, $LegacyCodex)) {
+    (Join-Path $AdapterDir "SKILL.md"), $AdapterBackup, $Backups, $ClaudeBackup, $CodexBackup, $LegacyCodex)) {
     Assert-InstallPath $Path
 }
 if ((Test-Path $ClaudeBackup) -or (Test-Path $CodexBackup)) { Fail "backup destination already exists; re-run the installer" }
+if (Test-Path $AdapterBackup) { Fail "adapter backup destination already exists; re-run the installer" }
 
 # Archive a legacy full copy living where the small adapter belongs (v0.1/v0.2 layouts).
 if ((Test-Path $AdapterDir) -and ((Test-Path (Join-Path $AdapterDir "auditors")) -or (Test-Path (Join-Path $AdapterDir ".git")))) {
@@ -137,7 +139,9 @@ try {
     [System.IO.File]::WriteAllBytes($AdapterTemp, [System.IO.File]::ReadAllBytes($AdapterSource))
     Assert-InstallPath $AdapterTarget
     if (Test-Path $AdapterTarget) {
-        [System.IO.File]::Replace($AdapterTemp, $AdapterTarget, $null)
+        Assert-InstallPath $AdapterBackup
+        [System.IO.File]::Replace($AdapterTemp, $AdapterTarget, $AdapterBackup)
+        Remove-Item -LiteralPath $AdapterBackup -Force
     } else {
         [System.IO.File]::Move($AdapterTemp, $AdapterTarget)
     }

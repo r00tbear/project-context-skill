@@ -2126,7 +2126,7 @@ class DashboardTests(unittest.TestCase):
             'id="select-visible-findings"',
             'id="copy-master-prompt"',
             'id="master-prompt-preview"',
-            'class="selection-control"',
+            'class="select-visible-control"',
             ".selection-control { display: inline-grid; width: 44px; height: 44px",
             "const selectedFindingIds = new Set()",
             "item.checkbox && !item.row.hidden",
