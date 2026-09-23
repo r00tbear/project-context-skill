@@ -10,7 +10,7 @@
       "outcome": "coverage-incomplete",
       "domains": {"ui": "absent", "data": "absent"},
       "coverage": {
-        "required": ["stack", "architecture", "bloat", "security", "testing"],
+        "required": ["stack", "architecture", "bloat", "performance", "security", "testing"],
         "completed": [],
         "skipped": {"ui": "No interactive surface.", "data": "No persisted or shared data contract."},
         "failed": []

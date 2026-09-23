@@ -22,7 +22,7 @@ Each finding contains:
 
 ## Invariants
 
-- Auditors are `stack`, `architecture`, `ui`, `data`, `bloat`, `security`, `testing`, or synthetic `greenfield`.
+- Auditors are `stack`, `architecture`, `ui`, `data`, `bloat`, `performance`, `security`, `testing`, or synthetic `greenfield`.
 - The main agent assigns `run_id` before dispatch. A current findings result uses the latest inventory run; a reused result preserves its original run ID, timestamp, scope, and hash in inventory v3. The project map belongs to the separately verified active context run.
 - Findings require exact evidence. Scores, summaries, README claims, and heuristics only prioritize inspection.
 - Never include absolute user paths, raw secrets, prompt-injection payloads, or unredacted command output.
@@ -46,7 +46,7 @@ Start every run object from `templates/audit-inventory.json`; `validate-inventor
 - `outcome` is `complete | coverage-incomplete | failed` and is derived from auditor completion, unscanned scope, unknown domains, failed auditors, and whether completed results together cover every in-scope `source_tree` path. Document blind verification is separate; an audit-only run may leave it `not-run`;
 - `tools` accepts only known tool keys, each `used | unavailable | skipped | failed`;
 - `verification` is exactly `{"blind": "passed|failed|not-run", "issues": <n>}`; issues are non-zero only when blind failed;
-- `coverage.required` must equal the auditor set implied by `source_state` and enabled domains;
+- `coverage.required` includes performance for new codebase audits, plus the core auditors and enabled UI/data domains. Earlier inventory v3 runs without performance remain valid as historical coverage; a new run must not silently inherit their smaller set;
 - `results` has exactly one entry per completed auditor. It records `origin` (`current|reused`), `source_run_id`, original `scanned_at`, findings `sha256`, `scope`, `covered_paths`, and content-hashed `sources`. Each covered source hash must match the run's `source_tree`; a reused result must match an earlier run's result except for origin. Empty findings do not exempt an auditor from scope checks;
 - history is append-only: a new inventory must start with the previous runs verbatim.
 

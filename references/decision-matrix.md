@@ -18,4 +18,4 @@ Always ask before:
 - paid services or infrastructure;
 - compatibility-affecting persisted/shared data or protocol changes.
 
-Ask by topic in this order when enabled: stack, architecture, UI, data, bloat, security, testing. State evidence, options, effort, trade-offs, and a recommendation. Record accepted policy in the in-memory ADR candidate immediately; persist it only with regenerated dependent docs. Policy changed by a reviewed diff cannot approve implementation in that same diff.
+Ask by topic in this order when enabled: stack, architecture, UI, data, performance, bloat, security, testing. State evidence, options, effort, trade-offs, and a recommendation. Record accepted policy in the in-memory ADR candidate immediately; persist it only with regenerated dependent docs. Policy changed by a reviewed diff cannot approve implementation in that same diff.

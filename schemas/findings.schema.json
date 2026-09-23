@@ -45,6 +45,7 @@
     "ui",
     "data",
     "bloat",
+    "performance",
     "security",
     "testing",
     "greenfield"
