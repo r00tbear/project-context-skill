@@ -3484,6 +3484,19 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
         artifact_id: artifact["path"]
         for artifact_id, artifact in project["artifacts"].items()
     }
+    artifact_source_runs = {
+        artifact_id: run["id"]
+        for artifact_id, artifact in project["artifacts"].items()
+        for run in project["inventory"]["runs"]
+        if artifact["path"] == f"repodocs/audit/reports/{run['id']}.md"
+    }
+    if manifest["schema_version"] == 2:
+        artifact_source_runs.update(
+            {
+                f"finding_{auditor}": result["source_run_id"]
+                for auditor, result in latest["results"].items()
+            }
+        )
     model["context_map"] = {
         "nodes": [
             {
@@ -3502,10 +3515,9 @@ def dashboard_snapshot(repo: Path) -> dict[str, Any]:
                     project["markdown"].get(artifact["path"], "").encode("utf-8")
                 )
                 > 65536,
-                "source_run_id": context_run["id"]
-                if context_run
-                and not artifact["path"].startswith("repodocs/audit/reports/")
-                else latest["id"],
+                "source_run_id": artifact_source_runs.get(
+                    artifact_id, context_run["id"] if context_run else latest["id"]
+                ),
                 "sections": artifact.get("sections", []),
                 "evidence": [
                     {

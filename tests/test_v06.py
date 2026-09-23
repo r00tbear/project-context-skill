@@ -553,6 +553,15 @@ class V06Tests(unittest.TestCase):
             self.assertEqual(
                 run["id"], dashboard_snapshot(root)["audit"]["latest"]["id"]
             )
+            source_runs = {
+                node["id"]: node["source_run_id"]
+                for node in dashboard_snapshot(root)["context_map"]["nodes"]
+            }
+            self.assertEqual(inventory["runs"][0]["id"], source_runs["audit_report"])
+            self.assertEqual(run["id"], source_runs["audit_report_two"])
+            self.assertEqual(
+                inventory["runs"][0]["id"], source_runs["finding_architecture"]
+            )
             (root / "src/main.py").write_text("value = 2\n")
             report = drift(root)
             self.assertEqual(["src/main.py"], report["changed"])
