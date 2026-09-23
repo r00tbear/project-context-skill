@@ -15,9 +15,7 @@ Before v0.5.0 the check was strict: any version delta invalidated the context.
 - Findings v3 include a verifiable fix brief. Remediation prompts bind selected identities to the complete active count/hash; `validate-remediation` checks that binding. The dashboard forms explicit groups of up to 250.
 - Context Explorer shows up to 64 KiB of manifest-owned document text as text. Task briefs, deferred-review dates, exact context diff previews and narrow-screen controls are available locally.
 
-## v0.5.3
-
-**Regeneration required: no** (patch: safe host writes, installer paths, and instruction inventory reads; generated contracts unchanged).
+The planned v0.5.3 patch fixes ship in v0.6.0; v0.5.3 was not published. These fixes do not change generated contracts:
 
 - `merge-host --apply` checks the expected input fingerprint, rechecks the fixed root host target, writes beside it, and atomically replaces it. Preview remains stdout-only.
 - Both installers reject symlink/junction components in destinations and backups before mutation, recheck before writes, and replace the Claude adapter atomically.
