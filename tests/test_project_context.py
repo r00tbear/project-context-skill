@@ -1383,11 +1383,15 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             findings = outside / "audit/findings"
             findings.mkdir(parents=True)
             (findings / "private.yaml").write_text("secret\n", encoding="utf-8")
+            (outside / "project-context.config.json").write_text(
+                json.dumps(config()), encoding="utf-8"
+            )
             (root / "repodocs").symlink_to(outside, target_is_directory=True)
             result = preflight(root)
             self.assertTrue(
                 any(item["path"] == "repodocs" for item in result["host_errors"])
             )
+            self.assertFalse(result["config_exists"])
             self.assertNotIn("private.yaml", str(result))
 
     @requires_symlinks

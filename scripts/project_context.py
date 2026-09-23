@@ -1554,7 +1554,11 @@ def _resolve_existing(path: Path, label: str) -> Path:
 
 def _context_state(root: Path) -> tuple[str, str | None]:
     repodocs = root / "repodocs"
-    has_repodocs = repodocs.is_dir() and any(repodocs.iterdir())
+    has_repodocs = (
+        not _is_symlink_or_junction(repodocs)
+        and repodocs.is_dir()
+        and any(repodocs.iterdir())
+    )
     has_managed_host = False
     host_problem: str | None = None
     for host, relative in HOST_FILES.items():
@@ -2055,9 +2059,11 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
     evidence = _source_evidence(root)
     worktree_clean = _source_worktree_clean(root)
     exclusions: list[str] = []
-    config_path = root / CONFIG_PATH
-    if config_path.is_file():
-        try:
+    config_exists = False
+    try:
+        config_path = safe_path(root, CONFIG_PATH, must_exist=True)
+        config_exists = config_path.is_file()
+        if config_exists:
             config = validate_config(
                 strict_json_loads(
                     _decode_text(_read_regular(config_path, CONFIG_PATH), CONFIG_PATH),
@@ -2065,8 +2071,8 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
                 )
             )
             exclusions = list(config["audit"]["exclude"])
-        except ContractError:
-            exclusions = []  # an invalid config is already reported through context_state
+    except ContractError:
+        pass  # an absent or unsafe config is already reported through context_state
     instruction_map, instructions_truncated = _agent_instruction_map(root)
     for entry in instruction_map:
         entry["in_excluded_scope"] = _covered_by(entry["path"], exclusions)
@@ -2085,7 +2091,7 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         "source_state": "codebase" if evidence else "greenfield",
         "source_evidence": evidence,
         "canonical_config": CONFIG_PATH,
-        "config_exists": (root / CONFIG_PATH).is_file(),
+        "config_exists": config_exists,
         "legacy_surfaces": legacy,
         "scope_review": _scope_review(root, exclusions),
         "decision_citations": _decision_citations(root),
