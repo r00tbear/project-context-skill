@@ -14,6 +14,7 @@ from collections import Counter
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from scripts.project_context import (
     HOST_MARKERS,
@@ -1387,11 +1388,23 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
                 json.dumps(config()), encoding="utf-8"
             )
             (root / "repodocs").symlink_to(outside, target_is_directory=True)
-            result = preflight(root)
+            original_lexists = os.path.lexists
+            with patch(
+                "scripts.project_context.os.path.lexists", wraps=original_lexists
+            ) as lexists:
+                result = preflight(root)
+            self.assertFalse(
+                any(
+                    Path(call.args[0]).is_relative_to(root / "repodocs")
+                    and Path(call.args[0]) != root / "repodocs"
+                    for call in lexists.call_args_list
+                )
+            )
             self.assertTrue(
                 any(item["path"] == "repodocs" for item in result["host_errors"])
             )
             self.assertFalse(result["config_exists"])
+            self.assertEqual("invalid", result["context_state"])
             self.assertNotIn("private.yaml", str(result))
 
     @requires_symlinks

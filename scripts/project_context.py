@@ -247,6 +247,13 @@ def safe_path(root: Path, relative: Any, *, must_exist: bool = False) -> Path:
     return candidate
 
 
+def _lexists_in_safe_parent(root: Path, relative: str) -> bool:
+    parent = PurePosixPath(relative).parent
+    if parent != PurePosixPath("."):
+        safe_path(root, parent.as_posix())
+    return os.path.lexists(root / relative)
+
+
 def _read_regular(path: Path, label: str) -> bytes:
     try:
         info = os.lstat(path)
@@ -1554,16 +1561,14 @@ def _resolve_existing(path: Path, label: str) -> Path:
 
 def _context_state(root: Path) -> tuple[str, str | None]:
     repodocs = root / "repodocs"
-    has_repodocs = (
-        not _is_symlink_or_junction(repodocs)
-        and repodocs.is_dir()
-        and any(repodocs.iterdir())
-    )
+    if _is_symlink_or_junction(repodocs):
+        return "invalid", "repodocs: symlink is not allowed in generated path"
+    has_repodocs = repodocs.is_dir() and any(repodocs.iterdir())
     has_managed_host = False
     host_problem: str | None = None
     for host, relative in HOST_FILES.items():
         path = root / relative
-        if path.is_file():
+        if os.path.lexists(path):
             try:
                 text = _decode_text(_read_regular(path, relative), relative)
                 has_managed_host = (
@@ -1573,14 +1578,17 @@ def _context_state(root: Path) -> tuple[str, str | None]:
                 # A broken host file (symlink, non-UTF-8, malformed markers) is a reportable
                 # invalid state, never a crash - the dashboard must be able to show it.
                 host_problem = f"{relative}: {str(exc).replace(str(root), '<repo>')}"
-    has_surface = (
-        has_repodocs
-        or has_managed_host
-        or any(
-            os.path.lexists(root / relative)
-            for relative in (CONFIG_PATH, MANIFEST_PATH, "PROJECT_CONTEXT.md")
+    try:
+        has_surface = (
+            has_repodocs
+            or has_managed_host
+            or any(
+                _lexists_in_safe_parent(root, relative)
+                for relative in (CONFIG_PATH, MANIFEST_PATH, "PROJECT_CONTEXT.md")
+            )
         )
-    )
+    except ContractError as exc:
+        return "invalid", str(exc).replace(str(root), "<repo>")
     if host_problem is not None:
         return ("invalid", host_problem) if has_surface else ("absent", None)
     if not has_surface:
@@ -1965,14 +1973,12 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         ".codex",
         ".codex/config.toml",
     ):
-        path = root / relative
-        if os.path.lexists(path):
-            try:
-                safe_path(root, relative, must_exist=True)
-            except ContractError as exc:
-                host_errors.append(
-                    {"path": relative, "error": str(exc).replace(str(root), "<repo>")}
-                )
+        try:
+            safe_path(root, relative)
+        except ContractError as exc:
+            host_errors.append(
+                {"path": relative, "error": str(exc).replace(str(root), "<repo>")}
+            )
     repodocs = root / "repodocs"
     if os.path.lexists(repodocs) and not _is_symlink_or_junction(repodocs):
         if not repodocs.is_dir():
@@ -2003,7 +2009,7 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
         path = root / relative
         if any(entry["path"] == relative for entry in host_errors):
             continue  # already reported by the fixed-path check; one row per path
-        if path.is_file():
+        if os.path.lexists(path):
             try:
                 extract_host_block(
                     _decode_text(_read_regular(path, relative), relative), host
@@ -2012,17 +2018,21 @@ def preflight(repo: Path, skill_root: Path | None = None) -> dict[str, Any]:
                 host_errors.append(
                     {"path": relative, "error": str(exc).replace(str(root), "<repo>")}
                 )
-    legacy = [
-        relative
-        for relative in (
-            "project-context.config.yaml",
-            "repodocs/project-context.config.yaml",
-            "repodocs/audit/inventory.yaml",
-            "docs/project-context.config.yaml",
-            ".codex/skills/project-context",
-        )
-        if os.path.lexists(root / relative)
-    ]
+    legacy = []
+    for relative in (
+        "project-context.config.yaml",
+        "repodocs/project-context.config.yaml",
+        "repodocs/audit/inventory.yaml",
+        "docs/project-context.config.yaml",
+        ".codex/skills/project-context",
+    ):
+        try:
+            if _lexists_in_safe_parent(root, relative):
+                legacy.append(relative)
+        except ContractError as exc:
+            host_errors.append(
+                {"path": relative, "error": str(exc).replace(str(root), "<repo>")}
+            )
     # v0.1 root agents files: check the exact directory listing, not lexists, so a
     # case-insensitive filesystem never mistakes v0.2's AGENTS.md for legacy agents.md.
     root_entries = set(os.listdir(root))
