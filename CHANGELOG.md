@@ -6,6 +6,13 @@ enforces this by `(major, minor)` of the recorded skill version: a patch delta i
 warning, a minor/major delta reports `context_state: invalid` until the audit is re-run.
 Before v0.5.0 the check was strict: any version delta invalidated the context.
 
+## v0.6.2
+
+**Regeneration required: no** (dashboard-only audit rerun prompts; generated context formats are unchanged).
+
+- The Findings Auditor filter can copy a prompt to rerun one selected auditor or every auditor required by fresh preflight. The prompt binds the exact repository root and prior snapshot while preserving connected context and making partial coverage explicit.
+- Required auditors remain selectable even when their prior run was incomplete or produced no findings. Copying previews the prompt locally and never starts an audit.
+
 ## v0.6.1
 
 **Regeneration required: no** (additive performance auditor; existing v3 audit and context artifacts remain valid).

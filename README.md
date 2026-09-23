@@ -80,7 +80,7 @@ An audit-only repository has just the config, audit report, findings, inventory 
 After a successful run the skill opens a local, read-only dashboard (or ask for it anytime):
 
 - **Monitor** — validation state, auditor coverage, and the items that need attention first;
-- **Remediate** — every finding with original and effective severity, plus copyable agent prompts (per finding, a master prompt for a selection, or a vendor-neutral task list for your tracker);
+- **Remediate** — every finding with original and effective severity, plus copyable agent prompts (per finding, a master prompt for a selection, or a vendor-neutral task list for your tracker). The Auditor filter also copies a fresh audit request for one reviewer or all applicable reviewers;
 - **Explore** — an interactive project map, bounded plain-text previews of manifest-owned documents, and an inventory of files that instruct agents. Host configuration contents are withheld;
 - **Govern** — decisions, technical debt, audit history, and integrity checks.
 
