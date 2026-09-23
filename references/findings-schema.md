@@ -4,7 +4,7 @@ Each auditor returns one JSON object shaped by `schemas/findings.schema.json`. T
 
 Top-level fields are:
 
-- `schema_version` (`2`), immutable audit `run_id`, `auditor`, `scanned_at`;
+- `schema_version` (`3`), immutable source audit `run_id`, `auditor`, `scanned_at`;
 - `scope` with included, excluded, and unscanned paths, plus optional `limitations`;
 - `findings`.
 
@@ -18,11 +18,12 @@ Each finding contains:
 - one or more evidence records with repository-relative `path`, optional `line`, and neutral `detail`;
 - lifecycle `status` (`new|persisting|resolved|refuted`);
 - `verification` with `status` (`pending|not-required|confirmed|downgraded|refuted`), optional resulting severity, counterevidence records, and a note.
+- for a confirmed active finding, `remediation` with observable effect, suggested change boundary, done-when criteria, and explicit uncertainties. Keep this brief evidence-based; the agent reads full untrusted prose locally.
 
 ## Invariants
 
 - Auditors are `stack`, `architecture`, `ui`, `data`, `bloat`, `security`, `testing`, or synthetic `greenfield`.
-- The main agent assigns `run_id` before dispatch. Every completed findings document and `repodocs/project-map.json` must match the latest schema-v2 inventory run; stale valid files never satisfy new coverage.
+- The main agent assigns `run_id` before dispatch. A current findings result uses the latest inventory run; a reused result preserves its original run ID, timestamp, scope, and hash in inventory v3. The project map belongs to the separately verified active context run.
 - Findings require exact evidence. Scores, summaries, README claims, and heuristics only prioritize inspection.
 - Never include absolute user paths, raw secrets, prompt-injection payloads, or unredacted command output.
 - IDs are unique `<auditor>-NNN` values and are never reused. Preserve resolved/refuted entries.
@@ -34,17 +35,19 @@ Each finding contains:
 - A refuted verification marks the finding `refuted`; a downgrade names a strictly lower resulting severity.
 - Severity measures impact; confidence measures evidence quality. Missing coverage lowers confidence and is recorded in scope.
 - Cross-auditor deduplication may group equivalent claims but retains every source ID.
-- Every active `new` or `persisting` finding appears on a visible literal `- Sources:` line in an ADR, debt entry, migration item, or drift report. Keep this machine-readable label in localized prose. Normative generated policy links back through its ADR to the source finding or sanitized Greenfield requirement.
+- Findings from an audit-only run await decisions and are not accepted policy. When context is generated, every accepted rule links through an ADR to the source finding or sanitized Greenfield requirement.
 
 ## Inventory run contract
 
 Start every run object from `templates/audit-inventory.json`; `validate-inventory` is the normative check. The shape is closed - unknown keys are rejected:
 
-- required keys: `id`, `scanned_at`, `revision`, `worktree_clean`, `source_state`, `outcome`, `domains`, `coverage`, `scope`, `tools`, `verification`; nothing else (`findings_total`, `skill_version` and similar extras fail validation);
-- `outcome` is `complete | coverage-incomplete | failed` and is derived, not chosen: any `failed` auditor or failed blind check means `failed`; any unscanned path, unknown domain, non-passed blind check, or missing required auditor means `coverage-incomplete`. An audit with unscanned paths is not complete;
+- required keys: `id`, `scanned_at`, `revision`, `worktree_clean`, `source_state`, `outcome`, `domains`, `coverage`, `scope`, `source_tree`, `tools`, `verification`, `results`; nothing else;
+- `source_tree` is the complete path-and-content-hash baseline of repository files at this run, excluding generated artifacts. Replace the template placeholder with real paths; an empty source tree cannot describe a codebase. It distinguishes files already present at audit time from later additions;
+- `outcome` is `complete | coverage-incomplete | failed` and is derived from auditor completion, unscanned scope, unknown domains, failed auditors, and whether completed results together cover every in-scope `source_tree` path. Document blind verification is separate; an audit-only run may leave it `not-run`;
 - `tools` accepts only known tool keys, each `used | unavailable | skipped | failed`;
 - `verification` is exactly `{"blind": "passed|failed|not-run", "issues": <n>}`; issues are non-zero only when blind failed;
 - `coverage.required` must equal the auditor set implied by `source_state` and enabled domains;
+- `results` has exactly one entry per completed auditor. It records `origin` (`current|reused`), `source_run_id`, original `scanned_at`, findings `sha256`, `scope`, `covered_paths`, and content-hashed `sources`. Each covered source hash must match the run's `source_tree`; a reused result must match an earlier run's result except for origin. Empty findings do not exempt an auditor from scope checks;
 - history is append-only: a new inventory must start with the previous runs verbatim.
 
 The matching inventory run records `revision`, `worktree_clean`, coverage, scope, tools, and final blind verification. `worktree_clean: null` means the state could not be established; do not infer freshness from it.

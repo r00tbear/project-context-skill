@@ -12,13 +12,13 @@
         "Classify the repository as greenfield",
         "Ask only the required Preflight questions",
         "Track every fixed user constraint in a sanitized in-memory REQ-NNN coverage ledger with an explicit disposition",
-        "Return a technology-neutral proposal without claiming installation"
+        "Save a requirements-and-open-questions audit report without connecting context"
       ],
       "forbidden": [
         "Invent a framework, database, UI, or deployment model",
         "Run codebase auditors against placeholder content",
         "Persist the raw user brief or silently drop a fixed constraint",
-        "Write a partial generated state"
+        "Create findings about code that does not exist"
       ]
     },
     {
@@ -174,7 +174,7 @@
       "request": "Open the Project Context dashboard for this repository and refresh its data.",
       "setup": [
         "The candidate skill is installed for implicit invocation",
-        "The repository has a valid v0.3 Project Context"
+        "The repository has valid v0.6 audit and context artifacts"
       ],
       "expected": [
         "Invoke project-context",
@@ -247,8 +247,8 @@
         "Give a fresh read-only verifier only repository/config/scope and candidate artifacts",
         "Withhold findings, trace ledger, decision rationale, generation summary, expected answer, and raw Greenfield interview",
         "Detect and fix or record the omitted boundary before marking blind verification passed",
-        "Classify each blind issue as contradiction or omission; stop only at zero blocking and zero important contradictions, dispositioning final-pass omissions into the drift report and backlog",
-        "Stop at the eight-pass hard bound and record verification.blind failed with per-pass counts when the stopping rule is unmet",
+        "Classify each blind issue and stop only when zero unresolved issues remain",
+        "Stop at the eight-pass hard bound and record failed document verification when issues remain",
         "Treat validator success as structural proof only"
       ],
       "forbidden": [
@@ -291,8 +291,8 @@
       "expected": [
         "Reject the changed artifact and show an invalid state with a sanitized validation reason",
         "Do not treat the failed refresh as a new audit",
-        "Use current/stale/unknown only from comparable revision and worktree state",
-        "Keep source freshness unknown when the audited worktree was dirty or unknown"
+        "Use content hashes and covered-path composition to detect source changes without a HEAD change",
+        "Show added paths outside known source links as unknown impact"
       ],
       "forbidden": [
         "Display the changed artifact as validated data",

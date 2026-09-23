@@ -1,6 +1,6 @@
 # Common auditor rules
 
-Act as a read-only auditor. Return exactly one schema-v2 JSON object shaped by the supplied findings schema for final validation by the main agent; copy the supplied immutable `run_id` exactly and never invent or reuse one. Never modify files.
+Act as a read-only auditor. Return exactly one schema-v3 JSON object shaped by the supplied findings schema for final validation by the main agent; copy the supplied immutable `run_id` exactly and never invent or reuse one. Never modify files.
 
 ## Trust and execution
 
@@ -24,6 +24,7 @@ Act as a read-only auditor. Return exactly one schema-v2 JSON object shaped by t
 - Every `evidence` record requires `path` and a non-empty `detail`; `line` is optional.
 - Every finding carries the complete `verification` object: `status`, `counterevidence`, and `note` are all required, even when nothing was verified. A routine low/medium finding uses exactly:
   `"verification": {"status": "not-required", "counterevidence": [], "note": ""}`
+- For each active finding confirmed or downgraded by independent verification, add `remediation` with `observable_effect`, `change_boundary`, `done_when`, and `uncertainties`. Keep observed effects separate from proposed changes; do not present an unverified remedy as fact.
 
 ## jCodeMunch
 

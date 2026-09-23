@@ -14,6 +14,7 @@ from collections import Counter
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from scripts.project_context import (
     HOST_MARKERS,
@@ -42,7 +43,6 @@ from scripts.project_context import (
     validate_relative_path,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -55,7 +55,9 @@ def _symlinks_supported() -> bool:
         return False
 
 
-requires_symlinks = unittest.skipUnless(_symlinks_supported(), "symlink creation is unavailable on this platform")
+requires_symlinks = unittest.skipUnless(
+    _symlinks_supported(), "symlink creation is unavailable on this platform"
+)
 SCRIPT = ROOT / "scripts/project_context.py"
 SKILL_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 RUN_ID = "run-20260802-1"
@@ -89,14 +91,25 @@ def finding_document(severity: str = "medium", run_id: str = RUN_ID) -> dict[str
                 "title": "Mixed responsibilities",
                 "severity": severity,
                 "confidence": "high",
-                "identity": {"path": "src/module", "assertion": "Responsibilities are mixed"},
+                "identity": {
+                    "path": "src/module",
+                    "assertion": "Responsibilities are mixed",
+                },
                 "status": "new",
-                "evidence": [{"path": "src/module", "line": 4, "detail": "Two responsibilities meet here."}],
+                "evidence": [
+                    {
+                        "path": "src/module",
+                        "line": 4,
+                        "detail": "Two responsibilities meet here.",
+                    }
+                ],
                 "verification": {
                     "status": verification,
                     "resulting_severity": severity,
                     "counterevidence": [],
-                    "note": "Independently checked." if verification == "confirmed" else "Low impact.",
+                    "note": "Independently checked."
+                    if verification == "confirmed"
+                    else "Low impact.",
                 },
             }
         ],
@@ -119,9 +132,24 @@ def inventory(
                 "outcome": "complete",
                 "domains": {"ui": "absent", "data": "absent"},
                 "coverage": {
-                    "required": ["stack", "architecture", "bloat", "security", "testing"],
-                    "completed": ["stack", "architecture", "bloat", "security", "testing"],
-                    "skipped": {"ui": "No interactive surface", "data": "No persisted/shared contract"},
+                    "required": [
+                        "stack",
+                        "architecture",
+                        "bloat",
+                        "security",
+                        "testing",
+                    ],
+                    "completed": [
+                        "stack",
+                        "architecture",
+                        "bloat",
+                        "security",
+                        "testing",
+                    ],
+                    "skipped": {
+                        "ui": "No interactive surface",
+                        "data": "No persisted/shared contract",
+                    },
                     "failed": [],
                 },
                 "scope": {"included": ["."], "excluded": [], "unscanned": []},
@@ -157,22 +185,38 @@ class StrictJsonTests(unittest.TestCase):
 
     def test_rejects_non_finite_numbers(self) -> None:
         for token in ("NaN", "Infinity", "-Infinity"):
-            with self.subTest(token=token), self.assertRaisesRegex(ContractError, "non-finite"):
+            with (
+                self.subTest(token=token),
+                self.assertRaisesRegex(ContractError, "non-finite"),
+            ):
                 strict_json_loads('{"value":' + token + "}")
 
     def test_accepts_normal_json(self) -> None:
-        self.assertEqual({"a": [1, True, None]}, strict_json_loads('{"a":[1,true,null]}'))
+        self.assertEqual(
+            {"a": [1, True, None]}, strict_json_loads('{"a":[1,true,null]}')
+        )
 
 
 class PathTests(unittest.TestCase):
     def test_rejects_unsafe_relative_paths(self) -> None:
-        for value in (".", "../x", "a/../x", "a/./x", "/tmp/x", "a//x", "a\\x", ".git/config", "a\nfile"):
+        for value in (
+            ".",
+            "../x",
+            "a/../x",
+            "a/./x",
+            "/tmp/x",
+            "a//x",
+            "a\\x",
+            ".git/config",
+            "a\nfile",
+        ):
             with self.subTest(value=value), self.assertRaises(ContractError):
                 validate_relative_path(value)
 
     @unittest.skipUnless(os.name == "nt", "NTFS junctions exist only on Windows")
     def test_safe_path_rejects_ntfs_junction(self) -> None:
         import _winapi
+
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             target = base / "real"
@@ -199,13 +243,18 @@ class PathTests(unittest.TestCase):
     def test_safe_path_returns_normal_child(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.assertEqual(root.resolve() / "repodocs/context.md", safe_path(root, "repodocs/context.md"))
+            self.assertEqual(
+                root.resolve() / "repodocs/context.md",
+                safe_path(root, "repodocs/context.md"),
+            )
 
 
 class DocumentValidationTests(unittest.TestCase):
     def test_config_template_and_fixture_are_valid(self) -> None:
         self.assertEqual(1, validate_config(config())["schema_version"])
-        template = strict_json_loads((ROOT / "templates/project-context.config.json").read_text())
+        template = strict_json_loads(
+            (ROOT / "templates/project-context.config.json").read_text()
+        )
         validate_config(template)
 
     def test_config_rejects_non_boolean_host_and_unknown_key(self) -> None:
@@ -224,10 +273,18 @@ class DocumentValidationTests(unittest.TestCase):
             (finding_document(), validate_findings),
             (inventory(), validate_inventory),
             (project_map(), validate_project_map),
-            (strict_json_loads((ROOT / "templates/project-context.manifest.json").read_text()), validate_manifest),
+            (
+                strict_json_loads(
+                    (ROOT / "templates/project-context.manifest.json").read_text()
+                ),
+                validate_manifest,
+            ),
         )
         for value, validator in values_and_validators:
-            with self.subTest(validator=validator.__name__), self.assertRaisesRegex(ContractError, "schema_version"):
+            with (
+                self.subTest(validator=validator.__name__),
+                self.assertRaisesRegex(ContractError, "schema_version"),
+            ):
                 value["schema_version"] = True
                 validator(value)
 
@@ -259,7 +316,9 @@ class DocumentValidationTests(unittest.TestCase):
         previous = finding_document()
         current = copy.deepcopy(previous)
         current["findings"][0]["identity"]["assertion"] = "A different claim"
-        with self.assertRaisesRegex(ContractError, "assertion changed .* copy identity byte for byte"):
+        with self.assertRaisesRegex(
+            ContractError, "assertion changed .* copy identity byte for byte"
+        ):
             validate_findings(current, previous)
         current = copy.deepcopy(previous)
         current["findings"][0]["identity"]["path"] = "src/other"
@@ -278,7 +337,9 @@ class DocumentValidationTests(unittest.TestCase):
 
     def test_pending_verification_is_provisional_only(self) -> None:
         value = finding_document("high")
-        value["findings"][0]["verification"].update(status="pending", resulting_severity=None, note="Awaiting review.")
+        value["findings"][0]["verification"].update(
+            status="pending", resulting_severity=None, note="Awaiting review."
+        )
         with self.assertRaisesRegex(ContractError, "pending verification"):
             validate_findings(value)
         validate_findings(value, allow_provisional=True)
@@ -300,7 +361,9 @@ class DocumentValidationTests(unittest.TestCase):
         finding = value["findings"][0]
         finding["verification"].update(
             status="downgraded",
-            counterevidence=[{"path": "src/module", "detail": "Impact is locally contained."}],
+            counterevidence=[
+                {"path": "src/module", "detail": "Impact is locally contained."}
+            ],
         )
         with self.assertRaisesRegex(ContractError, "lower resulting severity"):
             validate_findings(value)
@@ -310,10 +373,14 @@ class DocumentValidationTests(unittest.TestCase):
     def test_scope_rejects_globs_and_accepts_limitations(self) -> None:
         value = finding_document()
         value["scope"]["included"] = ["packages/*/package.json"]
-        with self.assertRaisesRegex(ContractError, r"glob characters.*packages/\*/package\.json"):
+        with self.assertRaisesRegex(
+            ContractError, r"glob characters.*packages/\*/package\.json"
+        ):
             validate_findings(value)
         value = finding_document()
-        value["scope"]["limitations"] = ["The index parser does not cover Bash; those files were read directly."]
+        value["scope"]["limitations"] = [
+            "The index parser does not cover Bash; those files were read directly."
+        ]
         validate_findings(value)
         value["scope"]["limitations"] = [""]
         with self.assertRaisesRegex(ContractError, "limitations"):
@@ -325,9 +392,13 @@ class DocumentValidationTests(unittest.TestCase):
         self.assertIn("[[context]]", stripped)
         self.assertNotIn("ADR-925", stripped)
         self.assertNotIn("fenced", stripped)
-        self.assertNotIn("double", strip_code_spans("Quoted ``[[double#Anchor]]`` example."))
+        self.assertNotIn(
+            "double", strip_code_spans("Quoted ``[[double#Anchor]]`` example.")
+        )
         self.assertNotIn("tilde", strip_code_spans("~~~\n[[tilde#Anchor]]\n~~~\n"))
-        mixed = strip_code_spans("```\ncode\n   ```\nreal [[context]] text\n```\nmore code\n```\n")
+        mixed = strip_code_spans(
+            "```\ncode\n   ```\nreal [[context]] text\n```\nmore code\n```\n"
+        )
         self.assertIn("[[context]]", mixed)
 
     def test_config_excludes_are_literal_paths(self) -> None:
@@ -349,9 +420,13 @@ class DocumentValidationTests(unittest.TestCase):
         previous["findings"][0]["verification"].update(
             status="refuted",
             resulting_severity=None,
-            counterevidence=[{"path": "src/module", "detail": "The claim does not reproduce."}],
+            counterevidence=[
+                {"path": "src/module", "detail": "The claim does not reproduce."}
+            ],
         )
-        with self.assertRaisesRegex(ContractError, "refuted finding cannot return as active"):
+        with self.assertRaisesRegex(
+            ContractError, "refuted finding cannot return as active"
+        ):
             validate_findings(finding_document("high"), previous)
 
     def test_previous_findings_must_use_same_auditor(self) -> None:
@@ -426,7 +501,9 @@ class DocumentValidationTests(unittest.TestCase):
             validate_project_map(no_evidence)
 
     def test_manifest_template_and_fixture_are_valid(self) -> None:
-        template = strict_json_loads((ROOT / "templates/project-context.manifest.json").read_text())
+        template = strict_json_loads(
+            (ROOT / "templates/project-context.manifest.json").read_text()
+        )
         validate_manifest(template)
         template["artifacts"].append(copy.deepcopy(template["artifacts"][0]))
         template["artifacts"][-1]["id"] = "context_copy"
@@ -434,14 +511,37 @@ class DocumentValidationTests(unittest.TestCase):
             validate_manifest(template)
 
     def test_manifest_rejects_paths_outside_generated_surface(self) -> None:
-        value = strict_json_loads((ROOT / "templates/project-context.manifest.json").read_text())
+        value = strict_json_loads(
+            (ROOT / "templates/project-context.manifest.json").read_text()
+        )
         value["artifacts"][0]["path"] = "src/main.py"
         with self.assertRaisesRegex(ContractError, "outside the generated surface"):
             validate_manifest(value)
 
     def test_context_id_must_name_root_context(self) -> None:
-        value = strict_json_loads((ROOT / "templates/project-context.manifest.json").read_text())
-        value["artifacts"][0]["id"] = "root"
+        value = strict_json_loads(
+            (ROOT / "templates/project-context.manifest.json").read_text()
+        )
+        value["profile"] = "context"
+        value["context_run_id"] = "audit-20260101T000000Z-template"
+        value["domains"] = ["architecture", "stack", "security", "testing"]
+        value["artifacts"].append(
+            {
+                "id": "root",
+                "path": "PROJECT_CONTEXT.md",
+                "kind": "owned_file",
+                "sha256": sha256_bytes(b""),
+                "sections": [
+                    {
+                        "id": "overview",
+                        "source_run_id": value["context_run_id"],
+                        "covered_paths": [],
+                        "coverage_sha256": sha256_bytes(b"[]"),
+                        "sources": [],
+                    }
+                ],
+            }
+        )
         with self.assertRaisesRegex(ContractError, "context id"):
             validate_manifest(value)
 
@@ -504,17 +604,24 @@ class ProjectValidationTests(unittest.TestCase):
     ) -> dict[str, Any]:
         (root / "repodocs/audit").mkdir(parents=True)
         config_value = config()
-        config_raw = (json.dumps(config_value, indent=2, sort_keys=True) + "\n").encode()
+        config_raw = (
+            json.dumps(config_value, indent=2, sort_keys=True) + "\n"
+        ).encode()
         (root / "repodocs/project-context.config.json").write_bytes(config_raw)
 
         inventory_value = inventory(revision, worktree_clean)
         inventory_value["runs"][0]["outcome"] = "coverage-incomplete"
         inventory_value["runs"][0]["coverage"]["completed"] = []
-        inventory_raw = (json.dumps(inventory_value, indent=2, sort_keys=True) + "\n").encode()
+        inventory_raw = (
+            json.dumps(inventory_value, indent=2, sort_keys=True) + "\n"
+        ).encode()
         (root / "repodocs/audit/inventory.json").write_bytes(inventory_raw)
 
         project_map_raw = (
-            json.dumps(project_map(inventory_value["runs"][0]["id"]), indent=2, sort_keys=True) + "\n"
+            json.dumps(
+                project_map(inventory_value["runs"][0]["id"]), indent=2, sort_keys=True
+            )
+            + "\n"
         ).encode()
         (root / "repodocs/project-map.json").write_bytes(project_map_raw)
 
@@ -529,8 +636,12 @@ class ProjectValidationTests(unittest.TestCase):
             ("migration_backlog", "repodocs/migration-backlog.md"),
             ("drift_report", "repodocs/audit/drift-report.md"),
         ]
-        files = {"PROJECT_CONTEXT.md": "# Context\n\nSee [[architecture]] and [[context]].\n"}
-        files.update({path: f"# {artifact_id}\n" for artifact_id, path in file_artifacts})
+        files = {
+            "PROJECT_CONTEXT.md": "# Context\n\nSee [[architecture]] and [[context]].\n"
+        }
+        files.update(
+            {path: f"# {artifact_id}\n" for artifact_id, path in file_artifacts}
+        )
         for relative, text in files.items():
             (root / relative).write_text(text, encoding="utf-8")
         claude = merge_host_text("# Claude-only note\n", "claude")
@@ -608,9 +719,9 @@ class ProjectValidationTests(unittest.TestCase):
         inventory_value["runs"][0]["coverage"]["completed"] = ["architecture"]
         inventory_raw = json.dumps(inventory_value, sort_keys=True).encode()
         inventory_path.write_bytes(inventory_raw)
-        next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(
-            inventory_raw
-        )
+        next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")[
+            "sha256"
+        ] = sha256_bytes(inventory_raw)
 
         findings_value = finding_document(run_id=run_id)
         if title is not None:
@@ -620,7 +731,11 @@ class ProjectValidationTests(unittest.TestCase):
         findings_path.parent.mkdir(parents=True, exist_ok=True)
         findings_path.write_bytes(findings_raw)
         finding_artifact = next(
-            (item for item in manifest["artifacts"] if item["id"] == "finding_architecture"),
+            (
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "finding_architecture"
+            ),
             None,
         )
         if finding_artifact is None:
@@ -635,15 +750,21 @@ class ProjectValidationTests(unittest.TestCase):
 
         decisions = f"# decisions\n\n- Sources: {reference}\n"
         (root / "repodocs/decisions.md").write_text(decisions, encoding="utf-8")
-        next(item for item in manifest["artifacts"] if item["id"] == "decisions")["sha256"] = sha256_text(decisions)
-        (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        next(item for item in manifest["artifacts"] if item["id"] == "decisions")[
+            "sha256"
+        ] = sha256_text(decisions)
+        (root / "repodocs/project-context.manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
 
     def test_warns_on_unmanaged_repodocs_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self._write_project(root)
             self.assertEqual([], validate_project(root)["warnings"])
-            (root / "repodocs/notes.md").write_text("stray hand-written notes\n", encoding="utf-8")
+            (root / "repodocs/notes.md").write_text(
+                "stray hand-written notes\n", encoding="utf-8"
+            )
             self.assertIn(
                 "unmanaged file in repodocs/: repodocs/notes.md (not owned by the manifest)",
                 validate_project(root)["warnings"],
@@ -658,7 +779,10 @@ class ProjectValidationTests(unittest.TestCase):
             block = extract_host_block(original, "claude")
             assert block is not None
             claude_path.write_text(
-                original.replace(block, block.replace("PROJECT_CONTEXT.md", "OTHER.md")), encoding="utf-8"
+                original.replace(
+                    block, block.replace("PROJECT_CONTEXT.md", "OTHER.md")
+                ),
+                encoding="utf-8",
             )
             with self.assertRaisesRegex(ContractError, "drifted"):
                 validate_project(root)
@@ -671,7 +795,9 @@ class ProjectValidationTests(unittest.TestCase):
             root = Path(temporary)
             manifest = self._write_project(root)
             manifest["hosts"] = ["claude"]
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
             with self.assertRaisesRegex(ContractError, "hosts do not match"):
                 validate_project(root)
 
@@ -688,7 +814,9 @@ class ProjectValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self._write_project(root)
-            (root / "repodocs/architecture.md").write_text("changed\n", encoding="utf-8")
+            (root / "repodocs/architecture.md").write_text(
+                "changed\n", encoding="utf-8"
+            )
             with self.assertRaisesRegex(ContractError, "hash mismatch"):
                 validate_project(root)
 
@@ -699,7 +827,9 @@ class ProjectValidationTests(unittest.TestCase):
             text = "# Context\n\nSee [[missing]].\n"
             (root / "PROJECT_CONTEXT.md").write_text(text, encoding="utf-8")
             manifest["artifacts"][0]["sha256"] = sha256_text(text)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
             with self.assertRaisesRegex(ContractError, "unknown wikilinks"):
                 validate_project(root)
 
@@ -710,7 +840,9 @@ class ProjectValidationTests(unittest.TestCase):
             text = "# Architecture\n\nSee [[missing]].\n"
             (root / "repodocs/architecture.md").write_text(text, encoding="utf-8")
             manifest["artifacts"][1]["sha256"] = sha256_text(text)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
             with self.assertRaisesRegex(ContractError, "unknown wikilinks"):
                 validate_project(root)
 
@@ -721,7 +853,9 @@ class ProjectValidationTests(unittest.TestCase):
             text = "# Context\n\nSee [[Missing]].\n"
             (root / "PROJECT_CONTEXT.md").write_text(text, encoding="utf-8")
             manifest["artifacts"][0]["sha256"] = sha256_text(text)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
             with self.assertRaisesRegex(ContractError, "malformed wikilinks"):
                 validate_project(root)
 
@@ -745,7 +879,9 @@ class ProjectValidationTests(unittest.TestCase):
             config_path = root / "repodocs/project-context.config.json"
             config_value = config()
             config_value["domains"]["ui"] = "enabled"
-            config_raw = (json.dumps(config_value, indent=2, sort_keys=True) + "\n").encode()
+            config_raw = (
+                json.dumps(config_value, indent=2, sort_keys=True) + "\n"
+            ).encode()
             config_path.write_bytes(config_raw)
             manifest["config_sha256"] = sha256_bytes(config_raw)
             manifest["domains"].append("ui")
@@ -753,11 +889,15 @@ class ProjectValidationTests(unittest.TestCase):
             inventory_value = strict_json_loads(inventory_path.read_text())
             inventory_value["runs"][0]["domains"]["ui"] = "enabled"
             inventory_value["runs"][0]["coverage"]["required"].append("ui")
-            inventory_raw = (json.dumps(inventory_value, indent=2, sort_keys=True) + "\n").encode()
+            inventory_raw = (
+                json.dumps(inventory_value, indent=2, sort_keys=True) + "\n"
+            ).encode()
             inventory_path.write_bytes(inventory_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(
-                inventory_raw
-            )
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_bytes(inventory_raw)
             manifest_path = root / "repodocs/project-context.manifest.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             with self.assertRaisesRegex(ContractError, "requires repodocs/ui-kit.md"):
@@ -770,28 +910,47 @@ class ProjectValidationTests(unittest.TestCase):
             config_path = root / "repodocs/project-context.config.json"
             config_value = config()
             config_value["document_layout"] = "compact"
-            config_raw = (json.dumps(config_value, indent=2, sort_keys=True) + "\n").encode()
+            config_raw = (
+                json.dumps(config_value, indent=2, sort_keys=True) + "\n"
+            ).encode()
             config_path.write_bytes(config_raw)
             manifest["config_sha256"] = sha256_bytes(config_raw)
-            topic_ids = {"architecture", "techstack", "security", "testing", "edge_cases"}
+            topic_ids = {
+                "architecture",
+                "techstack",
+                "security",
+                "testing",
+                "edge_cases",
+            }
             for artifact in list(manifest["artifacts"]):
                 if artifact["id"] in topic_ids:
                     (root / artifact["path"]).unlink()
                     manifest["artifacts"].remove(artifact)
             topics = ("stack", "architecture", "security", "testing", "edge-cases")
-            context = "# Context\n\n" + "\n".join(
-                f'[[context#{topic}]]\n\n<a id="{topic}"></a>\n## {topic}' for topic in topics
-            ) + "\n"
+            context = (
+                "# Context\n\n"
+                + "\n".join(
+                    f'[[context#{topic}]]\n\n<a id="{topic}"></a>\n## {topic}'
+                    for topic in topics
+                )
+                + "\n"
+            )
             (root / "PROJECT_CONTEXT.md").write_text(context, encoding="utf-8")
-            next(item for item in manifest["artifacts"] if item["id"] == "context")["sha256"] = sha256_text(context)
+            next(item for item in manifest["artifacts"] if item["id"] == "context")[
+                "sha256"
+            ] = sha256_text(context)
             manifest_path = root / "repodocs/project-context.manifest.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             validate_project(root)
             context = context.replace('<a id="testing"></a>\n', "")
             (root / "PROJECT_CONTEXT.md").write_text(context, encoding="utf-8")
-            next(item for item in manifest["artifacts"] if item["id"] == "context")["sha256"] = sha256_text(context)
+            next(item for item in manifest["artifacts"] if item["id"] == "context")[
+                "sha256"
+            ] = sha256_text(context)
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "unresolved wikilink anchor: context#testing"):
+            with self.assertRaisesRegex(
+                ContractError, "unresolved wikilink anchor: context#testing"
+            ):
                 validate_project(root)
 
     def test_rejects_unknown_wikilink_fragment(self) -> None:
@@ -800,9 +959,15 @@ class ProjectValidationTests(unittest.TestCase):
             manifest = self._write_project(root)
             text = "# Context\n\nSee [[decisions#missing]].\n"
             (root / "PROJECT_CONTEXT.md").write_text(text, encoding="utf-8")
-            next(item for item in manifest["artifacts"] if item["id"] == "context")["sha256"] = sha256_text(text)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "unresolved wikilink anchor: decisions#missing"):
+            next(item for item in manifest["artifacts"] if item["id"] == "context")[
+                "sha256"
+            ] = sha256_text(text)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ContractError, "unresolved wikilink anchor: decisions#missing"
+            ):
                 validate_project(root)
 
     def test_completed_auditor_requires_manifest_owned_findings(self) -> None:
@@ -814,11 +979,17 @@ class ProjectValidationTests(unittest.TestCase):
             inventory_value["runs"][0]["coverage"]["completed"] = ["architecture"]
             inventory_raw = json.dumps(inventory_value).encode()
             inventory_path.write_bytes(inventory_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(
-                inventory_raw
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_bytes(inventory_raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
             )
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "missing completed auditor findings"):
+            with self.assertRaisesRegex(
+                ContractError, "missing completed auditor findings"
+            ):
                 validate_project(root)
 
     def test_rejects_stale_findings_and_project_map_run_bindings(self) -> None:
@@ -826,7 +997,9 @@ class ProjectValidationTests(unittest.TestCase):
             root = Path(temporary)
             manifest = self._write_project(root)
             self._add_architecture_findings(root, manifest, run_id="stale-run")
-            with self.assertRaisesRegex(ContractError, "findings run_id does not match"):
+            with self.assertRaisesRegex(
+                ContractError, "findings run_id does not match"
+            ):
                 validate_project(root)
 
             self._add_architecture_findings(root, manifest)
@@ -835,14 +1008,20 @@ class ProjectValidationTests(unittest.TestCase):
             map_value["run_id"] = "stale-run"
             map_raw = json.dumps(map_value).encode()
             map_path.write_bytes(map_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "project_map")["sha256"] = sha256_bytes(
-                map_raw
+            next(item for item in manifest["artifacts"] if item["id"] == "project_map")[
+                "sha256"
+            ] = sha256_bytes(map_raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
             )
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "project map run_id does not match"):
+            with self.assertRaisesRegex(
+                ContractError, "project map run_id does not match"
+            ):
                 validate_project(root)
 
-    def test_rejects_inventory_source_state_that_disagrees_with_repository(self) -> None:
+    def test_rejects_inventory_source_state_that_disagrees_with_repository(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             manifest = self._write_project(root)
@@ -852,8 +1031,14 @@ class ProjectValidationTests(unittest.TestCase):
             value["runs"][0]["coverage"]["required"] = ["greenfield"]
             raw = json.dumps(value).encode()
             inventory_path.write_bytes(raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(raw)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_bytes(raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
             with self.assertRaisesRegex(ContractError, "source_state does not match"):
                 validate_project(root)
 
@@ -867,25 +1052,35 @@ class ProjectValidationTests(unittest.TestCase):
             inventory_value["runs"][0]["scope"]["unscanned"] = ["src"]
             inventory_raw = json.dumps(inventory_value).encode()
             inventory_path.write_bytes(inventory_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(
-                inventory_raw
-            )
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_bytes(inventory_raw)
             findings_path = root / "repodocs/audit/findings/architecture.json"
             findings_value = strict_json_loads(findings_path.read_text())
             findings_value["scope"]["unscanned"] = ["src"]
             findings_raw = json.dumps(findings_value).encode()
             findings_path.write_bytes(findings_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "finding_architecture")["sha256"] = sha256_bytes(
-                findings_raw
-            )
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "finding_architecture"
+            )["sha256"] = sha256_bytes(findings_raw)
             map_path = root / "repodocs/project-map.json"
             map_value = project_map()
             map_value["nodes"] = []
             map_raw = json.dumps(map_value).encode()
             map_path.write_bytes(map_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "project_map")["sha256"] = sha256_bytes(map_raw)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "active finding is outside completed audit scope"):
+            next(item for item in manifest["artifacts"] if item["id"] == "project_map")[
+                "sha256"
+            ] = sha256_bytes(map_raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ContractError, "active finding is outside completed audit scope"
+            ):
                 validate_project(root)
 
     def test_planned_project_map_edge_requires_adr_evidence(self) -> None:
@@ -900,7 +1095,9 @@ class ProjectValidationTests(unittest.TestCase):
                     "label": "Target",
                     "kind": "component",
                     "status": "planned",
-                    "evidence": [{"path": "repodocs/decisions.md", "detail": "Accepted target."}],
+                    "evidence": [
+                        {"path": "repodocs/decisions.md", "detail": "Accepted target."}
+                    ],
                 }
             )
             value["edges"] = [
@@ -913,19 +1110,31 @@ class ProjectValidationTests(unittest.TestCase):
             ]
             raw = json.dumps(value).encode()
             map_path.write_bytes(raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "project_map")["sha256"] = sha256_bytes(raw)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "planned project-map edge needs ADR evidence"):
+            next(item for item in manifest["artifacts"] if item["id"] == "project_map")[
+                "sha256"
+            ] = sha256_bytes(raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ContractError, "planned project-map edge needs ADR evidence"
+            ):
                 validate_project(root)
 
     def test_active_finding_reference_requires_exact_id_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             manifest = self._write_project(root)
-            self._add_architecture_findings(root, manifest, reference="prefix-architecture-001-suffix")
-            with self.assertRaisesRegex(ContractError, "active finding lacks a disposition reference"):
+            self._add_architecture_findings(
+                root, manifest, reference="prefix-architecture-001-suffix"
+            )
+            with self.assertRaisesRegex(
+                ContractError, "active finding lacks a disposition reference"
+            ):
                 validate_project(root)
-            self._add_architecture_findings(root, manifest, reference="Disposition: architecture-001.")
+            self._add_architecture_findings(
+                root, manifest, reference="Disposition: architecture-001."
+            )
             validate_project(root)
 
     def test_active_finding_reference_must_be_visible_on_sources_line(self) -> None:
@@ -941,13 +1150,17 @@ class ProjectValidationTests(unittest.TestCase):
                 root = Path(temporary)
                 manifest = self._write_project(root)
                 self._add_architecture_findings(root, manifest, reference=reference)
-                with self.assertRaisesRegex(ContractError, "active finding lacks a disposition reference"):
+                with self.assertRaisesRegex(
+                    ContractError, "active finding lacks a disposition reference"
+                ):
                     validate_project(root)
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             manifest = self._write_project(root)
-            self._add_architecture_findings(root, manifest, reference="[architecture-001](#finding)")
+            self._add_architecture_findings(
+                root, manifest, reference="[architecture-001](#finding)"
+            )
             validate_project(root)
 
     def test_normalizes_text_line_endings(self) -> None:
@@ -980,16 +1193,20 @@ class ProjectValidationTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             summary = validate_project(root)  # a patch delta warns, never invalidates
             self.assertEqual("valid", summary["status"])
-            self.assertTrue(any("compatible patch" in warning for warning in summary["warnings"]))
+            self.assertTrue(
+                any("compatible patch" in warning for warning in summary["warnings"])
+            )
             manifest["skill_version"] = SKILL_VERSION
             inventory_path = root / "repodocs/audit/inventory.json"
             inventory_value = strict_json_loads(inventory_path.read_text())
             inventory_value["runs"][0]["scope"]["excluded"] = ["vendor"]
             inventory_raw = json.dumps(inventory_value).encode()
             inventory_path.write_bytes(inventory_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(
-                inventory_raw
-            )
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_bytes(inventory_raw)
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             with self.assertRaisesRegex(ContractError, "unapproved audit exclusions"):
                 validate_project(root)
@@ -1004,7 +1221,10 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             hook = root / "fsmonitor-hook"
             hook.write_text(f"#!/bin/sh\ntouch {marker!s}\nexit 1\n", encoding="utf-8")
             hook.chmod(0o755)
-            subprocess.run(["git", "-C", str(root), "config", "core.fsmonitor", str(hook)], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "config", "core.fsmonitor", str(hook)],
+                check=True,
+            )
             preflight(root)
             self.assertFalse(marker.exists())
 
@@ -1016,10 +1236,16 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             (root / ".jcodemunch.jsonc").write_text("{}\n", encoding="utf-8")
             self.assertEqual("absent", preflight(root)["context_state"])
             ProjectValidationTests._write_project(root)
-            (root / "CLAUDE.md").write_text(merge_host_text("", "claude"), encoding="utf-8")
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+            (root / "CLAUDE.md").write_text(
+                merge_host_text("", "claude"), encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
             self.assertEqual("valid", preflight(root)["context_state"])
-            (root / "repodocs/architecture.md").write_text("drifted\n", encoding="utf-8")
+            (root / "repodocs/architecture.md").write_text(
+                "drifted\n", encoding="utf-8"
+            )
             result = preflight(root)
             self.assertEqual("invalid", result["context_state"])
             self.assertIn("hash mismatch", result["context_error"])
@@ -1030,7 +1256,9 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             (root / "README.md").write_text("\n", encoding="utf-8")
             self.assertEqual("greenfield", preflight(root)["source_state"])
-            (root / "project.specification").write_text("declarative state\n", encoding="utf-8")
+            (root / "project.specification").write_text(
+                "declarative state\n", encoding="utf-8"
+            )
             result = preflight(root)
             self.assertEqual("codebase", result["source_state"])
             self.assertIn("project.specification", result["source_evidence"])
@@ -1047,9 +1275,13 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "LICENSE").write_text("A real license is valid greenfield scaffolding.\n", encoding="utf-8")
+            (root / "LICENSE").write_text(
+                "A real license is valid greenfield scaffolding.\n", encoding="utf-8"
+            )
             (root / "repodocs").mkdir()
-            (root / "repodocs/architecture.md").write_text("unclaimed\n", encoding="utf-8")
+            (root / "repodocs/architecture.md").write_text(
+                "unclaimed\n", encoding="utf-8"
+            )
             self.assertEqual("codebase", preflight(root)["source_state"])
 
     def test_preflight_ignores_only_manifest_verified_generation(self) -> None:
@@ -1057,26 +1289,38 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             manifest = ProjectValidationTests._write_project(root)
-            (root / "CLAUDE.md").write_text(merge_host_text("", "claude"), encoding="utf-8")
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+            (root / "CLAUDE.md").write_text(
+                merge_host_text("", "claude"), encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
             inventory_path = root / "repodocs/audit/inventory.json"
             inventory_value = strict_json_loads(inventory_path.read_text())
             inventory_value["runs"][0]["source_state"] = "greenfield"
             inventory_value["runs"][0]["coverage"]["required"] = ["greenfield"]
             inventory_raw = json.dumps(inventory_value).encode()
             inventory_path.write_bytes(inventory_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "audit_inventory")["sha256"] = sha256_bytes(
-                inventory_raw
-            )
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_bytes(inventory_raw)
             map_path = root / "repodocs/project-map.json"
             map_value = project_map()
             map_value["nodes"] = []
             map_raw = json.dumps(map_value).encode()
             map_path.write_bytes(map_raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "project_map")["sha256"] = sha256_bytes(map_raw)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            next(item for item in manifest["artifacts"] if item["id"] == "project_map")[
+                "sha256"
+            ] = sha256_bytes(map_raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
             self.assertEqual("greenfield", preflight(root)["source_state"])
-            (root / "repodocs/architecture.md").write_text("drifted\n", encoding="utf-8")
+            (root / "repodocs/architecture.md").write_text(
+                "drifted\n", encoding="utf-8"
+            )
             self.assertEqual("codebase", preflight(root)["source_state"])
 
     @requires_symlinks
@@ -1121,10 +1365,47 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
                 (root / "repodocs/linked.md").symlink_to(outside)
                 result = preflight(root)  # reported structurally, never a crash
                 self.assertTrue(
-                    any("symlinks are not allowed" in entry["error"] for entry in result["host_errors"])
+                    any(
+                        "symlinks are not allowed" in entry["error"]
+                        for entry in result["host_errors"]
+                    )
                 )
             finally:
                 outside.unlink()
+
+    @requires_symlinks
+    def test_preflight_does_not_walk_symlinked_repodocs_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "repo"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            outside = base / "outside"
+            findings = outside / "audit/findings"
+            findings.mkdir(parents=True)
+            (findings / "private.yaml").write_text("secret\n", encoding="utf-8")
+            (outside / "project-context.config.json").write_text(
+                json.dumps(config()), encoding="utf-8"
+            )
+            (root / "repodocs").symlink_to(outside, target_is_directory=True)
+            original_lexists = os.path.lexists
+            with patch(
+                "scripts.project_context.os.path.lexists", wraps=original_lexists
+            ) as lexists:
+                result = preflight(root)
+            self.assertFalse(
+                any(
+                    Path(call.args[0]).is_relative_to(root / "repodocs")
+                    and Path(call.args[0]) != root / "repodocs"
+                    for call in lexists.call_args_list
+                )
+            )
+            self.assertTrue(
+                any(item["path"] == "repodocs" for item in result["host_errors"])
+            )
+            self.assertFalse(result["config_exists"])
+            self.assertEqual("invalid", result["context_state"])
+            self.assertNotIn("private.yaml", str(result))
 
     @requires_symlinks
     def test_preflight_reports_broken_host_file_structurally(self) -> None:
@@ -1134,7 +1415,9 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             (root / "AGENTS.md").write_text("shared instructions\n", encoding="utf-8")
             (root / "CLAUDE.md").symlink_to(root / "AGENTS.md")
             result = preflight(root)  # symlinked host files are widespread practice
-            self.assertTrue(any(entry["path"] == "CLAUDE.md" for entry in result["host_errors"]))
+            self.assertTrue(
+                any(entry["path"] == "CLAUDE.md" for entry in result["host_errors"])
+            )
             self.assertIn(result["context_state"], {"absent", "invalid"})
             snapshot = dashboard_snapshot(root)  # and the dashboard must still start
             self.assertIn(snapshot["context"]["state"], {"absent", "invalid"})
@@ -1145,17 +1428,27 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             (root / "agents.md").write_text("v0.1 output\n", encoding="utf-8")
             (root / "repodocs/audit/findings").mkdir(parents=True)
-            (root / "repodocs/audit/inventory.yaml").write_text("scanned_at: 2026-07-13\n", encoding="utf-8")
-            (root / "repodocs/audit/findings/stack.yaml").write_text("auditor: stack\n", encoding="utf-8")
+            (root / "repodocs/audit/inventory.yaml").write_text(
+                "scanned_at: 2026-07-13\n", encoding="utf-8"
+            )
+            (root / "repodocs/audit/findings/stack.yaml").write_text(
+                "auditor: stack\n", encoding="utf-8"
+            )
             legacy = preflight(root)["legacy_surfaces"]
-            for expected in ("agents.md", "repodocs/audit/inventory.yaml", "repodocs/audit/findings/stack.yaml"):
+            for expected in (
+                "agents.md",
+                "repodocs/audit/inventory.yaml",
+                "repodocs/audit/findings/stack.yaml",
+            ):
                 self.assertIn(expected, legacy)
 
     def test_preflight_legacy_agents_check_is_case_exact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
             self.assertNotIn("agents.md", preflight(root)["legacy_surfaces"])
 
     def test_preflight_scope_review_cross_checks_git(self) -> None:
@@ -1165,10 +1458,16 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             (root / "repodocs").mkdir()
             config_value = config()
             config_value["audit"]["exclude"] = ["skip-zone"]
-            (root / "repodocs/project-context.config.json").write_text(json.dumps(config_value), encoding="utf-8")
+            (root / "repodocs/project-context.config.json").write_text(
+                json.dumps(config_value), encoding="utf-8"
+            )
             (root / "skip-zone/prototype").mkdir(parents=True)
-            (root / "skip-zone/prototype/app.ts").write_text("export {}\n", encoding="utf-8")
-            (root / "skip-zone/prototype/AGENTS.md").write_text("instructions\n", encoding="utf-8")
+            (root / "skip-zone/prototype/app.ts").write_text(
+                "export {}\n", encoding="utf-8"
+            )
+            (root / "skip-zone/prototype/AGENTS.md").write_text(
+                "instructions\n", encoding="utf-8"
+            )
             subprocess.run(["git", "-C", str(root), "add", "skip-zone"], check=True)
             (root / ".gitignore").write_text("skip-zone/\n", encoding="utf-8")
             review = preflight(root)["scope_review"]
@@ -1177,18 +1476,27 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             self.assertEqual("skip-zone", entry["path"])
             self.assertEqual(2, entry["tracked_files"])
             self.assertTrue(entry["tracked_and_ignored"])
-            self.assertEqual(["skip-zone/prototype/AGENTS.md"], entry["agent_instruction_files"])
+            self.assertEqual(
+                ["skip-zone/prototype/AGENTS.md"], entry["agent_instruction_files"]
+            )
 
     def test_preflight_reports_existing_decision_citations(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "notes.ts").write_text("// per ADR-931 and MB-922\n// see ADR-931 again\n// heap sized 512MB-4GB and a LOADR-9 register are not decision ids\n", encoding="utf-8")
+            (root / "notes.ts").write_text(
+                "// per ADR-931 and MB-922\n// see ADR-931 again\n// heap sized 512MB-4GB and a LOADR-9 register are not decision ids\n",
+                encoding="utf-8",
+            )
             (root / "repodocs").mkdir()
-            (root / "repodocs/decisions.md").write_text("ADR-909 must not be reported\n", encoding="utf-8")
+            (root / "repodocs/decisions.md").write_text(
+                "ADR-909 must not be reported\n", encoding="utf-8"
+            )
             subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
             citations = preflight(root)["decision_citations"]
-            self.assertEqual({"ADR-931", "MB-922"}, {entry["id"] for entry in citations})
+            self.assertEqual(
+                {"ADR-931", "MB-922"}, {entry["id"] for entry in citations}
+            )
             adr = next(entry for entry in citations if entry["id"] == "ADR-931")
             self.assertEqual(["notes.ts"], adr["files"])
 
@@ -1201,11 +1509,19 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             (root / ".cursor/rules").mkdir(parents=True)
             (root / ".cursor/rules/style.mdc").write_text("rule\n", encoding="utf-8")
             (root / ".agents/skills/demo/reference").mkdir(parents=True)
-            (root / ".agents/skills/demo/SKILL.md").write_text("skill\n", encoding="utf-8")
-            (root / ".agents/skills/demo/reference/deep.md").write_text("internal\n", encoding="utf-8")
-            (root / "CLAUDE.md").write_text("ignored root host file\n", encoding="utf-8")
+            (root / ".agents/skills/demo/SKILL.md").write_text(
+                "skill\n", encoding="utf-8"
+            )
+            (root / ".agents/skills/demo/reference/deep.md").write_text(
+                "internal\n", encoding="utf-8"
+            )
+            (root / "CLAUDE.md").write_text(
+                "ignored root host file\n", encoding="utf-8"
+            )
             (root / ".gitignore").write_text("/CLAUDE.md\n", encoding="utf-8")
-            entries = {entry["path"]: entry for entry in preflight(root)["agent_instructions"]}
+            entries = {
+                entry["path"]: entry for entry in preflight(root)["agent_instructions"]
+            }
             self.assertIn("AGENTS.md", entries)
             self.assertTrue(entries["AGENTS.md"]["tracked"])
             self.assertIn("CLAUDE.md", entries)
@@ -1215,6 +1531,49 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             self.assertIn(".agents/skills/demo/SKILL.md", entries)
             self.assertNotIn(".agents/skills/demo/reference/deep.md", entries)
             self.assertIn("modified", entries["AGENTS.md"])
+
+    @requires_symlinks
+    def test_instruction_inventory_never_reads_through_parent_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "repo"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            module = root / "module"
+            module.mkdir()
+            (module / "CLAUDE.md").write_text(
+                "tracked instructions\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "-C", str(root), "add", "module/CLAUDE.md"], check=True
+            )
+            (module / "CLAUDE.md").unlink()
+            module.rmdir()
+            outside = base / "outside"
+            outside.mkdir()
+            canary = "EXTERNAL-INSTRUCTION-CANARY"
+            (outside / "CLAUDE.md").write_text(canary, encoding="utf-8")
+            module.symlink_to(outside, target_is_directory=True)
+            skill_dir = root / ".agents/skills/demo"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text("local skill\n", encoding="utf-8")
+            (skill_dir / "outside.md").symlink_to(outside / "CLAUDE.md")
+            snapshot = dashboard_snapshot(root)
+            entries = {entry["path"]: entry for entry in snapshot["agent_instructions"]}
+            self.assertEqual(
+                ["module/CLAUDE.md"], entries["module/CLAUDE.md"]["skipped_paths"]
+            )
+            self.assertIn(
+                ".agents/skills/demo/outside.md",
+                entries[".agents/skills/demo/SKILL.md"]["skipped_paths"],
+            )
+            self.assertNotIn(canary, json.dumps(snapshot))
+            self.assertTrue(
+                any(
+                    "module/CLAUDE.md" in item
+                    for item in snapshot["integrity"]["limitations"]
+                )
+            )
 
     def test_instruction_map_flags_failed_git_listing_as_unknown(self) -> None:
         # git runs but the listing fails (corrupt index): discovery must report
@@ -1236,9 +1595,13 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             (root / "apps/web").mkdir(parents=True)
-            (root / "apps/web/CLAUDE.md").write_text("nested, ignored, still loaded by the host\n", encoding="utf-8")
+            (root / "apps/web/CLAUDE.md").write_text(
+                "nested, ignored, still loaded by the host\n", encoding="utf-8"
+            )
             (root / ".gitignore").write_text("apps/*/CLAUDE.md\n", encoding="utf-8")
-            entries = {entry["path"]: entry for entry in preflight(root)["agent_instructions"]}
+            entries = {
+                entry["path"]: entry for entry in preflight(root)["agent_instructions"]
+            }
             self.assertIn("apps/web/CLAUDE.md", entries)
             self.assertTrue(entries["apps/web/CLAUDE.md"]["ignored"])
             self.assertFalse(entries["apps/web/CLAUDE.md"]["tracked"])
@@ -1246,14 +1609,22 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
     def test_governance_anchor_requires_matching_heading(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            manifest = self._project_with_decisions(root, '# decisions\n\n<a id="ADR-001"></a>\n## Решение ADR-001\n')
+            self._project_with_decisions(
+                root, '# decisions\n\n<a id="ADR-001"></a>\n## Решение ADR-001\n'
+            )
             with self.assertRaisesRegex(ContractError, "no matching '## ADR-001:"):
                 validate_project(root)
-            self._project_with_decisions(root, '# decisions\n\n<a id="ADR-001"></a>\n## ADR-001: Решение\n', fresh=False)
+            self._project_with_decisions(
+                root,
+                '# decisions\n\n<a id="ADR-001"></a>\n## ADR-001: Решение\n',
+                fresh=False,
+            )
             self.assertEqual("valid", validate_project(root)["status"])
 
     @staticmethod
-    def _project_with_decisions(root: Path, decisions_text: str, fresh: bool = True) -> dict[str, Any]:
+    def _project_with_decisions(
+        root: Path, decisions_text: str, fresh: bool = True
+    ) -> dict[str, Any]:
         if fresh:
             manifest = ProjectValidationTests._write_project(root)
         decisions_path = root / "repodocs/decisions.md"
@@ -1272,13 +1643,31 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             for host in (".agents", ".claude"):
                 (root / host / "skills/demo/reference").mkdir(parents=True)
-                (root / host / "skills/demo/SKILL.md").write_text("same skill body\n", encoding="utf-8")
-                (root / host / "skills/demo/reference/deep.md").write_text("shared\n", encoding="utf-8")
-            entries = {entry["path"]: entry["sha256"] for entry in preflight(root)["agent_instructions"]}
-            self.assertEqual(entries[".agents/skills/demo/SKILL.md"], entries[".claude/skills/demo/SKILL.md"])
-            (root / ".agents/skills/demo/reference/deep.md").write_text("diverged\n", encoding="utf-8")
-            entries = {entry["path"]: entry["sha256"] for entry in preflight(root)["agent_instructions"]}
-            self.assertNotEqual(entries[".agents/skills/demo/SKILL.md"], entries[".claude/skills/demo/SKILL.md"])
+                (root / host / "skills/demo/SKILL.md").write_text(
+                    "same skill body\n", encoding="utf-8"
+                )
+                (root / host / "skills/demo/reference/deep.md").write_text(
+                    "shared\n", encoding="utf-8"
+                )
+            entries = {
+                entry["path"]: entry["sha256"]
+                for entry in preflight(root)["agent_instructions"]
+            }
+            self.assertEqual(
+                entries[".agents/skills/demo/SKILL.md"],
+                entries[".claude/skills/demo/SKILL.md"],
+            )
+            (root / ".agents/skills/demo/reference/deep.md").write_text(
+                "diverged\n", encoding="utf-8"
+            )
+            entries = {
+                entry["path"]: entry["sha256"]
+                for entry in preflight(root)["agent_instructions"]
+            }
+            self.assertNotEqual(
+                entries[".agents/skills/demo/SKILL.md"],
+                entries[".claude/skills/demo/SKILL.md"],
+            )
 
     def test_preflight_requires_exact_git_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1300,11 +1689,22 @@ class PreflightAndSelfCheckTests(unittest.TestCase):
             shutil.copytree(
                 ROOT,
                 copy_root,
-                ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "tests", ".github", "repodocs"),
+                ignore=shutil.ignore_patterns(
+                    ".git",
+                    "__pycache__",
+                    ".pytest_cache",
+                    "tests",
+                    ".github",
+                    "repodocs",
+                ),
             )
             self.assertEqual("valid", self_check(copy_root)["status"])
-            (copy_root / "templates/unregistered-doc.md").write_text("stray payload file\n", encoding="utf-8")
-            with self.assertRaisesRegex(ContractError, "unregistered.*templates/unregistered-doc.md"):
+            (copy_root / "templates/unregistered-doc.md").write_text(
+                "stray payload file\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ContractError, "unregistered.*templates/unregistered-doc.md"
+            ):
                 self_check(copy_root)
 
 
@@ -1337,7 +1737,10 @@ class DashboardTests(unittest.TestCase):
 
     def test_snapshot_reports_current_stale_and_unknown_revision(self) -> None:
         for expected in ("current", "stale", "unknown"):
-            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temporary:
+            with (
+                self.subTest(expected=expected),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
                 root = Path(temporary)
                 subprocess.run(["git", "init", "-q", str(root)], check=True)
                 revision = self._commit_source(root, "baseline\n")
@@ -1346,11 +1749,17 @@ class DashboardTests(unittest.TestCase):
                     revision=None if expected == "unknown" else revision,
                     worktree_clean=None if expected == "unknown" else True,
                 )
-                (root / "CLAUDE.md").write_text(merge_host_text("", "claude"), encoding="utf-8")
-                (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+                (root / "CLAUDE.md").write_text(
+                    merge_host_text("", "claude"), encoding="utf-8"
+                )
+                (root / "AGENTS.md").write_text(
+                    merge_host_text("", "codex"), encoding="utf-8"
+                )
                 if expected == "stale":
                     self._commit_source(root, "changed\n")
-                self.assertEqual(expected, dashboard_snapshot(root)["project"]["revision_state"])
+                self.assertEqual(
+                    expected, dashboard_snapshot(root)["project"]["revision_state"]
+                )
 
     def test_snapshot_marks_user_host_edits_stale(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1358,21 +1767,32 @@ class DashboardTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             revision = self._commit_source(root, "baseline\n")
             ProjectValidationTests._write_project(root, revision=revision)
-            (root / "CLAUDE.md").write_text(merge_host_text("", "claude"), encoding="utf-8")
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
-            self.assertEqual("current", dashboard_snapshot(root)["project"]["revision_state"])
             (root / "CLAUDE.md").write_text(
-                (root / "CLAUDE.md").read_text(encoding="utf-8") + "\nUser policy changed.\n",
+                merge_host_text("", "claude"), encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
+            self.assertEqual(
+                "current", dashboard_snapshot(root)["project"]["revision_state"]
+            )
+            (root / "CLAUDE.md").write_text(
+                (root / "CLAUDE.md").read_text(encoding="utf-8")
+                + "\nUser policy changed.\n",
                 encoding="utf-8",
             )
-            self.assertEqual("stale", dashboard_snapshot(root)["project"]["revision_state"])
+            self.assertEqual(
+                "stale", dashboard_snapshot(root)["project"]["revision_state"]
+            )
 
     def test_snapshot_preserves_semantic_host_indentation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             claude_path = root / "CLAUDE.md"
-            claude_path.write_text(merge_host_text("Rule\n", "claude"), encoding="utf-8")
+            claude_path.write_text(
+                merge_host_text("Rule\n", "claude"), encoding="utf-8"
+            )
             subprocess.run(["git", "-C", str(root), "add", "CLAUDE.md"], check=True)
             subprocess.run(
                 [
@@ -1391,11 +1811,21 @@ class DashboardTests(unittest.TestCase):
             )
             revision = self._commit_source(root, "baseline\n")
             ProjectValidationTests._write_project(root, revision=revision)
-            claude_path.write_text(merge_host_text("Rule\n", "claude"), encoding="utf-8")
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
-            self.assertEqual("current", dashboard_snapshot(root)["project"]["revision_state"])
-            claude_path.write_text(merge_host_text("    Rule\n", "claude"), encoding="utf-8")
-            self.assertEqual("stale", dashboard_snapshot(root)["project"]["revision_state"])
+            claude_path.write_text(
+                merge_host_text("Rule\n", "claude"), encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
+            self.assertEqual(
+                "current", dashboard_snapshot(root)["project"]["revision_state"]
+            )
+            claude_path.write_text(
+                merge_host_text("    Rule\n", "claude"), encoding="utf-8"
+            )
+            self.assertEqual(
+                "stale", dashboard_snapshot(root)["project"]["revision_state"]
+            )
 
     def test_snapshot_accepts_canonical_merge_of_tracked_bom_host(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1421,9 +1851,15 @@ class DashboardTests(unittest.TestCase):
             )
             revision = self._commit_source(root, "baseline\n")
             ProjectValidationTests._write_project(root, revision=revision)
-            claude_path.write_bytes(b"\xef\xbb\xbf" + merge_host_text("Rule\n", "claude").encode("utf-8"))
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
-            self.assertEqual("current", dashboard_snapshot(root)["project"]["revision_state"])
+            claude_path.write_bytes(
+                b"\xef\xbb\xbf" + merge_host_text("Rule\n", "claude").encode("utf-8")
+            )
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
+            self.assertEqual(
+                "current", dashboard_snapshot(root)["project"]["revision_state"]
+            )
 
     def test_dashboard_html_escapes_embedded_script_terminator(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1439,10 +1875,16 @@ class DashboardTests(unittest.TestCase):
             finding = finding_document()["findings"][0]
             expected_identity_sha256 = sha256_bytes(
                 json.dumps(
-                    finding["identity"], ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                    finding["identity"],
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
                 ).encode("utf-8")
             )
-            self.assertEqual(expected_identity_sha256, dashboard_snapshot(root)["findings"][0]["identity_sha256"])
+            self.assertEqual(
+                expected_identity_sha256,
+                dashboard_snapshot(root)["findings"][0]["identity_sha256"],
+            )
             html = render_dashboard_html(root, nonce="test_nonce").decode("utf-8")
             self.assertNotIn("</script><img", html)
             self.assertIn("\\u003c/script\\u003e", html)
@@ -1463,7 +1905,7 @@ class DashboardTests(unittest.TestCase):
             "path control": 'graphButton("Find path"',
             "path helper": "Find path: choose a start node, then a destination.",
             "native tooltips": "button.title = ariaLabel",
-            "truncated lane tooltip": "if (lane.group.length > 34) laneLabel.append(svgMake(\"title\", {}, lane.group))",
+            "truncated lane tooltip": 'if (lane.group.length > 34) laneLabel.append(svgMake("title", {}, lane.group))',
             "zoom out": 'graphButton("Zoom −", "Zoom out")',
             "zoom in": 'graphButton("Zoom +", "Zoom in")',
             "fit": 'graphButton("Fit", "Fit all project map nodes")',
@@ -1497,7 +1939,9 @@ class DashboardTests(unittest.TestCase):
                 self.assertNotRegex(source, sink)
         self.assertNotIn("Trace route", source)
 
-    def test_dashboard_workspace_navigation_and_typed_attention_drilldown_contract(self) -> None:
+    def test_dashboard_workspace_navigation_and_typed_attention_drilldown_contract(
+        self,
+    ) -> None:
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
         for token in (
             'aria-label="Project Context workspaces"',
@@ -1509,8 +1953,8 @@ class DashboardTests(unittest.TestCase):
             'title="Show authored project topology"',
             'title="Browse validated context relationships"',
             'title="Clear all finding filters"',
-            'repositoryName.title = repositoryName.textContent',
-            'repositoryRevision.title = asText(project.revision, repositoryRevision.textContent)',
+            "repositoryName.title = repositoryName.textContent",
+            "repositoryRevision.title = asText(project.revision, repositoryRevision.textContent)",
             'contextAction.title = "Open this finding\'s evidence artifact in Context Explorer"',
             '<li><a href="#project-map">Project topology</a></li>',
             '<li><a href="#context-map">Context documents</a></li>',
@@ -1524,32 +1968,34 @@ class DashboardTests(unittest.TestCase):
             'inspector.scrollIntoView({block: "start"})',
             'if (item.kind !== "finding")',
             'openFinding.addEventListener("click", () => openFullFinding(finding))',
-            'item.details.open = true',
+            "item.details.open = true",
             'navigateWorkspace("#findings", () => {',
             'item.details.querySelector("summary").focus()',
             'navigateWorkspace("#context-map", () => {',
-            'activateMapTab(route.mapTab)',
+            "activateMapTab(route.mapTab)",
             'document.querySelector(".skip-link").addEventListener("click", (event) => {',
             'form.setAttribute("action", `${window.location.pathname}${window.location.hash || "#attention"}`)',
             'window.addEventListener("hashchange", update)',
-            'const views = new Map([',
+            "const views = new Map([",
             '["#attention", {view: "attention", section: "overview"}]',
             '["#project-map", {view: "map", section: "map", mapTab: "project"}]',
             '["#context-map", {view: "map", section: "map", mapTab: "context"}]',
-            'byId(id).hidden = id !== route.section',
+            "byId(id).hidden = id !== route.section",
             'byId("main").dataset.view = route.view',
             'link.setAttribute("aria-current", "location")',
             'link.setAttribute("aria-current", "page")',
-            'const selected = buttons.find((entry) => asText(entry.node.id) === selectedNodeId)',
-            'selectNode(asText(visible[0].node.id), false)',
+            "const selected = buttons.find((entry) => asText(entry.node.id) === selectedNodeId)",
+            "selectNode(asText(visible[0].node.id), false)",
             'emptyState("No matching context artifact"',
-            'button.title = nodePath(node)',
+            "button.title = nodePath(node)",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, source)
         self.assertNotIn('row.addEventListener("click"', source)
 
-    def test_focused_context_groups_pairs_but_preserves_raw_wikilink_occurrences(self) -> None:
+    def test_focused_context_groups_pairs_but_preserves_raw_wikilink_occurrences(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -1558,7 +2004,7 @@ class DashboardTests(unittest.TestCase):
             documents = {
                 "PROJECT_CONTEXT.md": (
                     '# Context\n\n<a id="self"></a>\n'
-                    '[[architecture]] [[architecture#target]] [[architecture#target|again]] [[context#self]]\n'
+                    "[[architecture]] [[architecture#target]] [[architecture#target|again]] [[context#self]]\n"
                 ),
                 "repodocs/architecture.md": (
                     '# Architecture\n\n<a id="target"></a>\n[[context]] [[context#self]]\n'
@@ -1566,7 +2012,9 @@ class DashboardTests(unittest.TestCase):
             }
             for relative, text in documents.items():
                 (root / relative).write_text(text, encoding="utf-8")
-                next(item for item in manifest["artifacts"] if item["path"] == relative)["sha256"] = sha256_text(text)
+                next(
+                    item for item in manifest["artifacts"] if item["path"] == relative
+                )["sha256"] = sha256_text(text)
             (root / "repodocs/project-context.manifest.json").write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
@@ -1576,12 +2024,22 @@ class DashboardTests(unittest.TestCase):
             self.assertEqual(6, snapshot["integrity"]["wikilinks"])
             self.assertEqual(6, len(edges))
             self.assertEqual(
-                Counter({("context", "architecture"): 3, ("architecture", "context"): 2, ("context", "context"): 1}),
+                Counter(
+                    {
+                        ("context", "architecture"): 3,
+                        ("architecture", "context"): 2,
+                        ("context", "context"): 1,
+                    }
+                ),
                 Counter((edge["from"], edge["to"]) for edge in edges),
             )
             self.assertEqual(
                 Counter({"links to": 1, "links to #target": 2}),
-                Counter(edge["label"] for edge in edges if edge["from"] == "context" and edge["to"] == "architecture"),
+                Counter(
+                    edge["label"]
+                    for edge in edges
+                    if edge["from"] == "context" and edge["to"] == "architecture"
+                ),
             )
 
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
@@ -1621,16 +2079,25 @@ class DashboardTests(unittest.TestCase):
         # A failed discovery (empty list + truncated flag) must never render as a
         # verified-clean inventory; the guard has to run before the clean empty state.
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
-        instructions_source = source.split("function renderInstructions", 1)[1].split("function renderHistory", 1)[0]
-        failure_index = instructions_source.index("Instruction discovery could not complete")
+        instructions_source = source.split("function renderInstructions", 1)[1].split(
+            "function renderHistory", 1
+        )[0]
+        failure_index = instructions_source.index(
+            "Instruction discovery could not complete"
+        )
         clean_index = instructions_source.index("No agent instruction files found")
-        self.assertLess(instructions_source.index("agent_instructions_truncated === true"), clean_index)
+        self.assertLess(
+            instructions_source.index("agent_instructions_truncated === true"),
+            clean_index,
+        )
         self.assertLess(failure_index, clean_index)
         self.assertIn("not verified empty", instructions_source)
 
     def test_findings_ai_prompt_has_safe_state_aware_lifecycle_contract(self) -> None:
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
-        prompt_source = source.split("function promptMode", 1)[1].split("function findingSearchText", 1)[0]
+        prompt_source = source.split("function promptMode", 1)[1].split(
+            "function findingSearchText", 1
+        )[0]
         # Prompt-contract tokens are asserted against the sliced prompt builders, so a
         # token drifting OUT of the prompt functions fails even if it survives
         # elsewhere in the page; page-chrome tokens are asserted against the file.
@@ -1638,16 +2105,16 @@ class DashboardTests(unittest.TestCase):
             "STOP: this snapshot is stale or its freshness is unknown",
             "Keep this historical id refuted forever",
             "a comparable re-audit may return this resolved id to persisting",
-            'prompt_contract: "project-context-remediation-v1"',
+            'prompt_contract: "project-context-remediation-v2"',
             "identity_sha256: asText(finding.identity_sha256)",
-            "Recompute identity_sha256 from the canonical record's complete identity object",
+            "validate-remediation --repo <repo> --input <binding.json>",
             "evidence_locations: promptLocations(finding.evidence)",
-            "validate each completed auditor candidate against its own saved --previous file",
+            "--previous-sha256",
             "previous findings scope, candidate findings scope, and candidate inventory scope",
             "validate-findings --input <candidate-findings.json> --previous <saved-previous-findings.json>",
             "validate-inventory --input <candidate-inventory.json> --previous <saved-previous-inventory.json>",
-            "Every completed auditor needs a findings document with the new run_id",
-            "A fresh read-only agent must perform blind verification",
+            "untouched auditor results with original run IDs and hashes",
+            "A fresh read-only agent must blind-check the candidate audit",
             "findings, trace ledger, decision rationale",
             "write the manifest last",
         ):
@@ -1687,12 +2154,14 @@ class DashboardTests(unittest.TestCase):
 
     def test_findings_master_prompt_binds_selected_active_snapshot_safely(self) -> None:
         source = (ROOT / "assets/dashboard.html").read_text(encoding="utf-8")
-        master_source = source.split("function masterFindingBinding", 1)[1].split("function findingSearchText", 1)[0]
+        master_source = source.split("function masterFindingBinding", 1)[1].split(
+            "function findingSearchText", 1
+        )[0]
         for token in (
             'id="select-visible-findings"',
             'id="copy-master-prompt"',
             'id="master-prompt-preview"',
-            'class="selection-control"',
+            'class="select-visible-control"',
             ".selection-control { display: inline-grid; width: 44px; height: 44px",
             "const selectedFindingIds = new Set()",
             "item.checkbox && !item.row.hidden",
@@ -1700,16 +2169,16 @@ class DashboardTests(unittest.TestCase):
             'contextState !== "valid"',
             'preview.addEventListener("toggle"',
             "cell.colSpan = 8",
-            'prompt_contract: "project-context-master-remediation-v1"',
+            'prompt_contract: "project-context-master-remediation-v2"',
             "expected_active_count: activeFindings.length",
-            "expected_active_findings: activeFindings.map",
+            "expected_active_sha256",
             "selected_findings: selected.map",
             "identity_sha256: asText(finding.identity_sha256)",
             "const MASTER_PROMPT_LIMITS = Object.freeze",
             "new TextEncoder().encode(prompt).byteLength",
             "Do not queue or dispatch work, create worktrees, edit code",
-            "the complete sorted active tuple set",
-            "never silently add or drop findings",
+            "complete active count/hash",
+            "validate-remediation --repo <repo> --input <binding.json>",
             "Build an in-memory queue for the selected active IDs only",
             "Before editing any selected original high/critical claim",
             "the coordinator builds a conflict graph and assigns exclusive ownership",
@@ -1718,13 +2187,11 @@ class DashboardTests(unittest.TestCase):
             "otherwise record coverage-incomplete",
             "before auditor dispatch",
             "--allow-provisional",
-            "including newly discovered ones",
-            "repodocs/project-map.json uses the new run_id",
-            "preserve map nodes/edges unless evidence-backed topology changed",
+            "Current findings documents use the new run_id",
+            "Existing policy documents, map, and host blocks remain bound",
             "Withhold findings, this bulk payload, trace ledger",
             "It may not execute project code, hooks, package managers, builds, tests, linters, plugins, generators, repository-configured tools, or use the network",
-            "Before any write, validate final findings",
-            "write repodocs/project-context.manifest.json last",
+            "write the manifest last",
             "Do not commit, push, open a PR, or deploy",
         ):
             with self.subTest(token=token):
@@ -1742,19 +2209,25 @@ class DashboardTests(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, master_source)
         self.assertLess(
-            master_source.index("activeFindings.length > MASTER_PROMPT_LIMITS.findings"),
+            master_source.index(
+                "selectedFindings.length > MASTER_PROMPT_LIMITS.findings"
+            ),
             master_source.index("let locationCount = 0"),
         )
-        self.assertIn("if (locationCount > MASTER_PROMPT_LIMITS.locations)", master_source)
+        self.assertIn(
+            "if (locationCount > MASTER_PROMPT_LIMITS.locations)", master_source
+        )
         command_order = [
             "validate-findings --input <candidate-findings.json>",
-            "validate-project-map --input <candidate-project-map.json>",
             "validate-inventory --input <post-blind-candidate-inventory.json>",
             "validate-manifest --input <candidate-manifest.json>",
             "validate-project --repo <exact-root>",
         ]
         positions = [master_source.index(command) for command in command_order]
         self.assertEqual(positions, sorted(positions))
+        self.assertNotIn(
+            "validate-project-map --input <candidate-project-map.json>", master_source
+        )
 
     def test_project_graph_snapshot_preserves_adversarial_topology_safely(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1766,8 +2239,20 @@ class DashboardTests(unittest.TestCase):
             evidence = [{"path": "src/module", "detail": "Authored edge."}]
             value = project_map()
             value["nodes"] = [
-                {"id": "alpha", "label": hostile, "kind": "component", "status": "current", "evidence": evidence},
-                {"id": "beta", "label": hostile, "kind": "component", "status": "current", "evidence": evidence},
+                {
+                    "id": "alpha",
+                    "label": hostile,
+                    "kind": "component",
+                    "status": "current",
+                    "evidence": evidence,
+                },
+                {
+                    "id": "beta",
+                    "label": hostile,
+                    "kind": "component",
+                    "status": "current",
+                    "evidence": evidence,
+                },
                 {
                     "id": "gamma",
                     "label": "Cycle",
@@ -1782,32 +2267,59 @@ class DashboardTests(unittest.TestCase):
                 {"from": "alpha", "to": "beta", "label": "calls", "evidence": evidence},
                 {"from": "alpha", "to": "beta", "label": "reads", "evidence": evidence},
                 {"from": "beta", "to": "alpha", "label": "calls", "evidence": evidence},
-                {"from": "beta", "to": "gamma", "label": "cycles", "evidence": evidence},
-                {"from": "gamma", "to": "alpha", "label": "cycles", "evidence": evidence},
+                {
+                    "from": "beta",
+                    "to": "gamma",
+                    "label": "cycles",
+                    "evidence": evidence,
+                },
+                {
+                    "from": "gamma",
+                    "to": "alpha",
+                    "label": "cycles",
+                    "evidence": evidence,
+                },
             ]
             validate_project_map(value)
             raw = json.dumps(value, sort_keys=True).encode()
             (root / "repodocs/project-map.json").write_bytes(raw)
-            next(item for item in manifest["artifacts"] if item["id"] == "project_map")["sha256"] = sha256_bytes(raw)
-            (root / "repodocs/project-context.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            next(item for item in manifest["artifacts"] if item["id"] == "project_map")[
+                "sha256"
+            ] = sha256_bytes(raw)
+            (root / "repodocs/project-context.manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
 
-            self.assertEqual({"nodes": value["nodes"], "edges": value["edges"]}, dashboard_snapshot(root)["project_map"])
+            self.assertEqual(
+                {"nodes": value["nodes"], "edges": value["edges"]},
+                dashboard_snapshot(root)["project_map"],
+            )
             html = render_dashboard_html(root, nonce="test_nonce").decode("utf-8")
             self.assertNotIn(hostile, html)
             self.assertIn("\\u003c/script\\u003e", html)
 
     def test_markdown_sections_mark_truncated_bodies_explicitly(self) -> None:
-        long_entry = "## ADR-901: Long\n" + "\n".join(f"- body line {index}" for index in range(10)) + "\n"
+        long_entry = (
+            "## ADR-901: Long\n"
+            + "\n".join(f"- body line {index}" for index in range(10))
+            + "\n"
+        )
         sections = _markdown_sections(long_entry, "ADR")
         self.assertEqual(9, len(sections[0]["lines"]))
         self.assertTrue(sections[0]["lines"][-1].startswith("…"))
         self.assertIn("truncated", sections[0]["lines"][-1])
-        exact_entry = "## ADR-902: Exact\n" + "\n".join(f"- body line {index}" for index in range(8)) + "\n"
+        exact_entry = (
+            "## ADR-902: Exact\n"
+            + "\n".join(f"- body line {index}" for index in range(8))
+            + "\n"
+        )
         sections = _markdown_sections(exact_entry, "ADR")
         self.assertEqual(8, len(sections[0]["lines"]))
         self.assertFalse(any("truncated" in line for line in sections[0]["lines"]))
 
-    def test_markdown_sections_ignore_anchors_in_canonical_multi_entry_documents(self) -> None:
+    def test_markdown_sections_ignore_anchors_in_canonical_multi_entry_documents(
+        self,
+    ) -> None:
         # The canonical template puts the NEXT entry's <a id> anchor above its heading;
         # an 8-line entry followed by an anchor must not read as truncated, and the
         # anchor must never surface as body text of the previous entry.
@@ -1817,13 +2329,17 @@ class DashboardTests(unittest.TestCase):
             + '\n\n<a id="ADR-902"></a>\n## ADR-902: Second\n- short body\n'
         )
         sections = _markdown_sections(canonical, "ADR")
-        self.assertEqual(["ADR-901", "ADR-902"], [section["id"] for section in sections])
+        self.assertEqual(
+            ["ADR-901", "ADR-902"], [section["id"] for section in sections]
+        )
         self.assertEqual(8, len(sections[0]["lines"]))
         self.assertFalse(any("truncated" in line for line in sections[0]["lines"]))
         self.assertNotIn("<a id=", sections[0]["summary"])
         self.assertEqual(["- short body"], sections[1]["lines"])
 
-    def test_instruction_view_resolves_artifacts_and_redacts_config_previews(self) -> None:
+    def test_instruction_view_resolves_artifacts_and_redacts_config_previews(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "CLAUDE.md").write_text(
@@ -1834,7 +2350,8 @@ class DashboardTests(unittest.TestCase):
             )
             (root / ".claude").mkdir()
             (root / ".claude/settings.local.json").write_text(
-                '{"apiKey": "sk-SECRETVALUE", "docs": "repodocs/architecture.md"}\n', encoding="utf-8"
+                '{"apiKey": "sk-SECRETVALUE", "docs": "repodocs/architecture.md"}\n',
+                encoding="utf-8",
             )
             entries = [{"path": "CLAUDE.md"}, {"path": ".claude/settings.local.json"}]
             markdown = {"repodocs/architecture.md": 'Intro\n<a id="shape"></a>\n'}
@@ -1862,9 +2379,17 @@ class DashboardTests(unittest.TestCase):
                 {link["raw"]: link["status"] for link in view[1]["links"]},
             )
             unverified = _instruction_view(root, entries, None)
-            self.assertTrue(all(link["status"] == "unverified" for item in unverified for link in item["links"]))
+            self.assertTrue(
+                all(
+                    link["status"] == "unverified"
+                    for item in unverified
+                    for link in item["links"]
+                )
+            )
 
-    def test_snapshot_redacts_config_previews_and_resolves_ownership_links(self) -> None:
+    def test_snapshot_redacts_config_previews_and_resolves_ownership_links(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -1872,22 +2397,34 @@ class DashboardTests(unittest.TestCase):
             ProjectValidationTests._write_project(root, revision=revision)
             (root / "CLAUDE.md").write_text(
                 merge_host_text(
-                    "Map: repodocs/project-map.json - owned by repodocs/project-context.manifest.json\n", "claude"
+                    "Map: repodocs/project-map.json - owned by repodocs/project-context.manifest.json\n",
+                    "claude",
                 ),
                 encoding="utf-8",
             )
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
             (root / ".claude").mkdir()
-            (root / ".claude/settings.json").write_text('{"token": "sk-EXTREMELY-SECRET"}\n', encoding="utf-8")
+            (root / ".claude/settings.json").write_text(
+                '{"token": "sk-EXTREMELY-SECRET"}\n', encoding="utf-8"
+            )
             snapshot = dashboard_snapshot(root)
             self.assertEqual("valid", snapshot["context"]["state"])
             entries = {entry["path"]: entry for entry in snapshot["agent_instructions"]}
             self.assertTrue(entries[".claude/settings.json"]["preview_redacted"])
             self.assertNotIn("sk-EXTREMELY-SECRET", json.dumps(snapshot))
-            statuses = {link["raw"]: link["status"] for link in entries["CLAUDE.md"]["links"]}
+            statuses = {
+                link["raw"]: link["status"] for link in entries["CLAUDE.md"]["links"]
+            }
             self.assertEqual("resolves", statuses["repodocs/project-map.json"])
-            self.assertEqual("resolves", statuses["repodocs/project-context.manifest.json"])
-            self.assertNotIn("sk-EXTREMELY-SECRET", render_dashboard_html(root, nonce="test_nonce").decode("utf-8"))
+            self.assertEqual(
+                "resolves", statuses["repodocs/project-context.manifest.json"]
+            )
+            self.assertNotIn(
+                "sk-EXTREMELY-SECRET",
+                render_dashboard_html(root, nonce="test_nonce").decode("utf-8"),
+            )
 
     def test_http_boundary_serves_only_the_token_route(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1895,19 +2432,34 @@ class DashboardTests(unittest.TestCase):
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             revision = self._commit_source(root, "baseline\n")
             ProjectValidationTests._write_project(root, revision=revision)
-            (root / "CLAUDE.md").write_text(merge_host_text("", "claude"), encoding="utf-8")
-            (root / "AGENTS.md").write_text(merge_host_text("", "codex"), encoding="utf-8")
-            server = ThreadingHTTPServer(("127.0.0.1", 0), _dashboard_handler_class(root, "/token123/"))
+            (root / "CLAUDE.md").write_text(
+                merge_host_text("", "claude"), encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                merge_host_text("", "codex"), encoding="utf-8"
+            )
+            server = ThreadingHTTPServer(
+                ("127.0.0.1", 0), _dashboard_handler_class(root, "/token123/")
+            )
             server.daemon_threads = True
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                def request(method: str, target: str, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], bytes]:
-                    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=30)
+
+                def request(
+                    method: str, target: str, headers: dict[str, str] | None = None
+                ) -> tuple[int, dict[str, str], bytes]:
+                    connection = http.client.HTTPConnection(
+                        "127.0.0.1", server.server_port, timeout=30
+                    )
                     try:
                         connection.request(method, target, headers=headers or {})
                         response = connection.getresponse()
-                        return response.status, {k.lower(): v for k, v in response.getheaders()}, response.read()
+                        return (
+                            response.status,
+                            {k.lower(): v for k, v in response.getheaders()},
+                            response.read(),
+                        )
                     finally:
                         connection.close()
 
@@ -1917,16 +2469,26 @@ class DashboardTests(unittest.TestCase):
                 self.assertEqual("nosniff", headers["x-content-type-options"])
                 self.assertEqual("no-store", headers["cache-control"])
                 self.assertIn(b"Project Context", body)
-                for target in ("/", "/token123", "/token123/?probe=1", "/other/", "/token123/../"):
+                for target in (
+                    "/",
+                    "/token123",
+                    "/token123/?probe=1",
+                    "/other/",
+                    "/token123/../",
+                ):
                     with self.subTest(target=target):
                         self.assertEqual(404, request("GET", target)[0])
                 status, headers, _ = request("POST", "/token123/")
                 self.assertEqual(405, status)
                 self.assertEqual("GET, HEAD", headers["allow"])
-                self.assertEqual(400, request("GET", "/token123/", {"Host": "evil.example"})[0])
+                self.assertEqual(
+                    400, request("GET", "/token123/", {"Host": "evil.example"})[0]
+                )
                 # HEAD over a raw socket: http.client discards HEAD bodies client-side,
                 # so only the wire proves the server sent headers and nothing else.
-                with socket.create_connection(("127.0.0.1", server.server_port), timeout=30) as raw:
+                with socket.create_connection(
+                    ("127.0.0.1", server.server_port), timeout=30
+                ) as raw:
                     raw.sendall(
                         f"HEAD /token123/ HTTP/1.1\r\nHost: 127.0.0.1:{server.server_port}\r\n"
                         "Connection: close\r\n\r\n".encode()
@@ -1953,7 +2515,12 @@ class CliTests(unittest.TestCase):
 
     @staticmethod
     def _run(*argv: str) -> subprocess.CompletedProcess[bytes]:
-        return subprocess.run([sys.executable, str(SCRIPT), *argv], capture_output=True, timeout=60)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *argv],
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
 
     def test_self_check_exits_zero(self) -> None:
         result = self._run("self-check", "--skill-root", str(ROOT))
@@ -1992,6 +2559,114 @@ class CliTests(unittest.TestCase):
             self.assertEqual(4, result.returncode)
             self.assertIn("out of order", json.loads(result.stderr)["error"])
 
+    def test_apply_host_preserves_user_bytes_and_rejects_changed_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "CLAUDE.md"
+            original = b"\xef\xbb\xbf# Mine\r\nUser instructions\r\n"
+            source.write_bytes(original)
+            fingerprint = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--input",
+                str(source),
+                "--input-sha256",
+            )
+            self.assertEqual(0, fingerprint.returncode)
+            expected = fingerprint.stdout.decode().strip()
+            preview = self._run(
+                "merge-host", "--host", "claude", "--input", str(source)
+            )
+            self.assertEqual(0, preview.returncode)
+            source.write_bytes(original + b"Another user edit\r\n")
+            rejected = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--repo",
+                str(root),
+                "--apply",
+                "--expected-sha256",
+                expected,
+            )
+            self.assertEqual(4, rejected.returncode)
+            self.assertEqual(original + b"Another user edit\r\n", source.read_bytes())
+            self.assertEqual([], list(root.glob(".CLAUDE.md.*")))
+            refreshed = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--input",
+                str(source),
+                "--input-sha256",
+            )
+            applied = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--repo",
+                str(root),
+                "--apply",
+                "--expected-sha256",
+                refreshed.stdout.decode().strip(),
+            )
+            self.assertEqual(0, applied.returncode, applied.stderr.decode())
+            self.assertEqual(
+                sha256_bytes(source.read_bytes()), json.loads(applied.stdout)["sha256"]
+            )
+            self.assertTrue(source.read_bytes().startswith(b"\xef\xbb\xbf"))
+            self.assertIn(
+                b"# Mine\r\nUser instructions\r\nAnother user edit\r\n",
+                source.read_bytes(),
+            )
+
+    def test_apply_host_error_keeps_original_and_create_requires_missing_file(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "CLAUDE.md"
+            begin, _ = HOST_MARKERS["claude"]
+            original = f"User rules\n{begin}\n".encode()
+            source.write_bytes(original)
+            fingerprint = sha256_text(original.decode())
+            failed = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--repo",
+                str(root),
+                "--apply",
+                "--expected-sha256",
+                fingerprint,
+            )
+            self.assertEqual(4, failed.returncode)
+            self.assertEqual(original, source.read_bytes())
+            self.assertEqual([], list(root.glob(".CLAUDE.md.*")))
+            source.unlink()
+            created = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--repo",
+                str(root),
+                "--apply",
+                "--allow-create",
+            )
+            self.assertEqual(0, created.returncode, created.stderr.decode())
+            self.assertEqual(merge_host_text("", "claude"), source.read_text())
+            again = self._run(
+                "merge-host",
+                "--host",
+                "claude",
+                "--repo",
+                str(root),
+                "--apply",
+                "--allow-create",
+            )
+            self.assertEqual(4, again.returncode)
+
     def test_validate_project_map_exits_zero(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "project-map.json"
@@ -2011,17 +2686,30 @@ class CliTests(unittest.TestCase):
             source = Path(temporary) / "source"
             source.mkdir()
             subprocess.run(["git", "init", "-q", str(source)], check=True)
-            (source / "README.md").write_text("a repository with no release tags\n", encoding="utf-8")
+            (source / "README.md").write_text(
+                "a repository with no release tags\n", encoding="utf-8"
+            )
             subprocess.run(["git", "-C", str(source), "add", "README.md"], check=True)
             subprocess.run(
-                ["git", "-C", str(source), "-c", "user.name=Project Context Tests",
-                 "-c", "user.email=tests@example.invalid", "commit", "-qm", "init"],
+                [
+                    "git",
+                    "-C",
+                    str(source),
+                    "-c",
+                    "user.name=Project Context Tests",
+                    "-c",
+                    "user.email=tests@example.invalid",
+                    "commit",
+                    "-qm",
+                    "init",
+                ],
                 check=True,
             )
             result = subprocess.run(
                 ["bash", str(ROOT / "install.sh")],
                 capture_output=True,
                 timeout=120,
+                check=False,
                 env={
                     **os.environ,
                     "PROJECT_CONTEXT_REPO": str(source),
@@ -2043,37 +2731,55 @@ class CliTests(unittest.TestCase):
             self.assertIn(message, windows)
         # Both extend PATH with the per-user bin directory BEFORE the first jCodeMunch
         # lookup, and honour PROJECT_CONTEXT_HOME rather than hardcoding $HOME there.
-        self.assertLess(posix.index('export PATH="$HOME_DIR/.local/bin'), posix.index("command -v jcodemunch-mcp"))
-        self.assertLess(windows.index('Join-Path $HomeDir ".local\\bin"'), windows.index("Get-Command jcodemunch-mcp"))
+        self.assertLess(
+            posix.index('export PATH="$HOME_DIR/.local/bin'),
+            posix.index("command -v jcodemunch-mcp"),
+        )
+        self.assertLess(
+            windows.index('Join-Path $HomeDir ".local\\bin"'),
+            windows.index("Get-Command jcodemunch-mcp"),
+        )
         self.assertNotIn("$HOME\\.local\\bin", windows)
         # jcodemunch-mcp init drops agent-instruction files into its CWD; both installers
         # must run it from a scratch directory, never the user's project or the payload.
-        self.assertLess(posix.index('(cd "$scratch_dir"'), posix.index("jcodemunch-mcp init"))
-        self.assertLess(windows.index("Push-Location $InitDir"), windows.index("jcodemunch-mcp init"))
+        self.assertLess(
+            posix.index('(cd "$scratch_dir"'), posix.index("jcodemunch-mcp init")
+        )
+        self.assertLess(
+            windows.index("Push-Location $InitDir"),
+            windows.index("jcodemunch-mcp init"),
+        )
         # Every stderr-silenced native call is scoped through Quiet, or PowerShell 5.1
         # can raise NativeCommandError before a $LASTEXITCODE guard runs. Pin BOTH the
         # single redirect and the scope swap inside the helper body - a Quiet without
         # the ErrorActionPreference swap would restore the hazard while keeping count.
-        self.assertEqual(1, windows.count("2>$null"), "bare 2>$null outside the Quiet helper")
+        self.assertEqual(
+            1, windows.count("2>$null"), "bare 2>$null outside the Quiet helper"
+        )
         quiet_body = windows.split("function Quiet", 1)[1].split("$RepoUrl", 1)[0]
         self.assertIn('$ErrorActionPreference = "Continue"', quiet_body)
         self.assertIn("finally", quiet_body)
         # Errors reach the error stream on both platforms; the mktemp scratch dir is
         # guarded so a failed mktemp can never leave init running in the user's cwd.
-        self.assertIn('>&2', posix)
+        self.assertIn(">&2", posix)
         self.assertIn("$Host.UI.WriteErrorLine", windows)
         self.assertIn('if scratch_dir="$(mktemp -d)" && (cd "$scratch_dir"', posix)
 
     @unittest.skipIf(
         os.name == "nt",
-        "install.sh test is POSIX-only; install.ps1 is never executed by CI (Windows is deliberately "
-        "out of the default pipeline) - its invariants are pinned by the mirror test and RELEASING.md's "
-        "manual Windows check",
+        "install.sh test is POSIX-only; the Windows CI job executes install.ps1 separately",
     )
     def test_installer_installs_updates_and_archives_legacy(self) -> None:
-        tags = subprocess.run(["git", "-C", str(ROOT), "tag", "-l", "v*"], capture_output=True, text=True)
+        tags = subprocess.run(
+            ["git", "-C", str(ROOT), "tag", "-l", "v*"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         if not tags.stdout.strip():
-            self.skipTest("no release tags in this clone (shallow CI checkout); the installer CI job covers it")
+            self.skipTest(
+                "no release tags in this clone (shallow CI checkout); the installer CI job covers it"
+            )
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             legacy = home / ".claude/skills/project-context"
@@ -2096,12 +2802,18 @@ class CliTests(unittest.TestCase):
             }
             for _ in range(2):  # second run exercises the update path
                 result = subprocess.run(
-                    ["bash", str(ROOT / "install.sh")], capture_output=True, env=environment, timeout=300
+                    ["bash", str(ROOT / "install.sh")],
+                    capture_output=True,
+                    env=environment,
+                    timeout=300,
+                    check=False,
                 )
                 self.assertEqual(0, result.returncode, result.stderr.decode())
             payload = home / ".agents/skills/project-context"
             self.assertTrue((payload / "VERSION").is_file())
-            adapter = (home / ".claude/skills/project-context/SKILL.md").read_text(encoding="utf-8")
+            adapter = (home / ".claude/skills/project-context/SKILL.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("project-context", adapter)
             backups = list((home / ".skill-backups").iterdir())
             self.assertEqual(1, len(backups))
@@ -2109,6 +2821,50 @@ class CliTests(unittest.TestCase):
             calls = (fake_bin / "calls.log").read_text(encoding="utf-8")
             self.assertIn("--version", calls)
             self.assertIn("init --client auto --yes", calls)
+
+    @unittest.skipIf(os.name == "nt", "install.sh requires a POSIX shell")
+    @requires_symlinks
+    def test_installer_refuses_adapter_symlinks_before_any_write(self) -> None:
+        for linked_parent in (False, True):
+            with (
+                self.subTest(linked_parent=linked_parent),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                base = Path(temporary)
+                home = base / "home"
+                home.mkdir()
+                outside = base / "outside"
+                outside.mkdir()
+                policy = outside / "policy.md"
+                policy.write_text("preserve this policy\n", encoding="utf-8")
+                if linked_parent:
+                    (outside / "project-context").mkdir()
+                    (outside / "project-context/SKILL.md").symlink_to(policy)
+                    (home / ".claude").mkdir()
+                    (home / ".claude/skills").symlink_to(
+                        outside, target_is_directory=True
+                    )
+                else:
+                    adapter = home / ".claude/skills/project-context"
+                    adapter.mkdir(parents=True)
+                    (adapter / "SKILL.md").symlink_to(policy)
+                result = subprocess.run(
+                    ["bash", str(ROOT / "install.sh")],
+                    capture_output=True,
+                    timeout=120,
+                    check=False,
+                    env={
+                        **os.environ,
+                        "PROJECT_CONTEXT_HOME": str(home),
+                        "PROJECT_CONTEXT_REPO": str(ROOT),
+                        "PROJECT_CONTEXT_VERSION": "v0.5.2",
+                        "PROJECT_CONTEXT_NO_JCODEMUNCH": "1",
+                    },
+                )
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("refusing a symlink", result.stderr.decode())
+                self.assertEqual("preserve this policy\n", policy.read_text())
+                self.assertFalse((home / ".agents/skills/project-context").exists())
 
     def test_previous_sha256_guards_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2119,15 +2875,33 @@ class CliTests(unittest.TestCase):
             document["findings"][0]["status"] = "persisting"
             current.write_text(json.dumps(document), encoding="utf-8")
             good = sha256_bytes(previous.read_bytes())
-            result = self._run("validate-findings", "--input", str(current), "--previous", str(previous), "--previous-sha256", good)
+            result = self._run(
+                "validate-findings",
+                "--input",
+                str(current),
+                "--previous",
+                str(previous),
+                "--previous-sha256",
+                good,
+            )
             self.assertEqual(0, result.returncode, result.stderr.decode())
             bad = "sha256:" + "0" * 64
-            result = self._run("validate-findings", "--input", str(current), "--previous", str(previous), "--previous-sha256", bad)
+            result = self._run(
+                "validate-findings",
+                "--input",
+                str(current),
+                "--previous",
+                str(previous),
+                "--previous-sha256",
+                bad,
+            )
             self.assertEqual(4, result.returncode)
             self.assertIn("unknown provenance", json.loads(result.stderr)["error"])
 
     def test_missing_repo_is_user_correctable(self) -> None:
-        result = self._run("preflight", "--repo", "/nonexistent/project-context-missing")
+        result = self._run(
+            "preflight", "--repo", "/nonexistent/project-context-missing"
+        )
         self.assertEqual(4, result.returncode)
         self.assertIn("does not exist", json.loads(result.stderr)["error"])
 

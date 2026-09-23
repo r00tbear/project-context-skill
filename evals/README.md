@@ -1,5 +1,7 @@
 # Behavioral and trigger evals
 
+The preregistered 24-session Claude/Codex context-vs-control study is specified in `paired-study.md`. Its primary metric requires a human reviewer; static case scoring below is a separate check.
+
 `cases.json` contains black-box behavioral and trigger specifications. `self-check`
 validates only static shape; the agent session is the harness — there is deliberately no
 Python eval runner, keeping the repository stdlib-only. The mechanical halves of many

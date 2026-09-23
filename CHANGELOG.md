@@ -6,6 +6,21 @@ enforces this by `(major, minor)` of the recorded skill version: a patch delta i
 warning, a minor/major delta reports `context_state: invalid` until the audit is re-run.
 Before v0.5.0 the check was strict: any version delta invalidated the context.
 
+## v0.6.0
+
+**Regeneration required: yes** (manifest v2, inventory v3, findings v3). Archive the v0.5.x surface with `archive-legacy`, then start a new audit series. Confirmed decisions can seed regeneration; source-cited ADR/MB headings are reserved.
+
+- Audits save a report, findings and coverage without generating policy or connecting hosts. A later audit preserves the active context's verified run link.
+- Per-auditor current/reused results retain source hashes, scope and run IDs against a full source-tree baseline. Policy sections must match their original run's source hashes. Audit completeness and document verification are independent. `drift --repo` compares working-tree bytes and flags unknown impact from added or unlinked changed paths.
+- Findings v3 include a verifiable fix brief. Remediation prompts bind selected identities to the complete active count/hash; `validate-remediation` checks that binding. The dashboard forms explicit groups of up to 250.
+- Context Explorer shows up to 64 KiB of manifest-owned document text as text. Task briefs, deferred-review dates, exact context diff previews and narrow-screen controls are available locally.
+
+The planned v0.5.3 patch fixes ship in v0.6.0; v0.5.3 was not published. These fixes do not change generated contracts:
+
+- `merge-host --apply` checks the expected input fingerprint, rechecks the fixed root host target, writes beside it, and atomically replaces it. Preview remains stdout-only.
+- Both installers reject symlink/junction components in destinations and backups before mutation, recheck before writes, and replace the Claude adapter atomically.
+- Agent-instruction inventory and preview reject unsafe nested paths without reading their contents. The dashboard reports the skipped paths as limitations.
+
 ## v0.5.2
 
 **Regeneration required: no** (patch: verification-process calibration, installer

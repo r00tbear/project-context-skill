@@ -17,14 +17,14 @@ python3 <skill-root>/scripts/project_context.py merge-host --host claude --input
 python3 <skill-root>/scripts/project_context.py merge-host --host codex --input AGENTS.md
 ```
 
-Apply atomically — write to a temp file and move it. **Never redirect onto the input file in the same command** (`--input CLAUDE.md > CLAUDE.md` makes the shell truncate the file before it is read; the validator now refuses the resulting empty input unless `--allow-create` is passed, which is only for a genuinely new file):
+Apply with the CLI after preview. First record the input fingerprint, then pass it to the guarded write. The command rechecks the target and atomically replaces it; an error leaves the original unchanged. **Never redirect onto the input file in the same command** (`--input CLAUDE.md > CLAUDE.md` truncates it before the CLI reads it):
 
 ```bash
-python3 <skill-root>/scripts/project_context.py merge-host --host claude --input CLAUDE.md > CLAUDE.md.new
-mv CLAUDE.md.new CLAUDE.md
+python3 <skill-root>/scripts/project_context.py merge-host --host claude --input CLAUDE.md --input-sha256
+python3 <skill-root>/scripts/project_context.py merge-host --host claude --repo . --apply --expected-sha256 sha256:<fingerprint-from-previous-command>
 ```
 
-Re-read each host file between preview and apply; abort if it changed — or pin it with `--expected-sha256 sha256:<hex>` of the previewed text (the optimistic lock fails the merge if the file moved underneath).
+For a genuinely absent host file, use `merge-host --host claude --repo . --apply --allow-create`. Repeat for `codex`/`AGENTS.md`. A mismatched fingerprint means re-read and preview again; never force the write.
 
 ## One payload for both hosts
 

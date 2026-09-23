@@ -20,3 +20,9 @@ The source of truth for generating the other docs. Changed a decision — regene
 - Decision: <the chosen option>
 - Governs: <generated artifact IDs/anchors whose normative rules cite this ADR>
 - Consequences: <what we migrate, what we ban; [[migration_backlog#MB-NNN]]>
+
+<!-- For Status: deferred, keep the finding lifecycle unchanged and add these lines:
+- Reason: <why no decision is taken now>
+- Review when: <observable event the agent checks during the next related task>
+- Review on: YYYY-MM-DD
+The date is optional; Reason and Review when are required. -->
