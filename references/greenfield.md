@@ -15,7 +15,7 @@ Ask one concise batch in the user's language:
 5. Which technology or platform choices are mandatory, if any?
 6. Does a user-facing interactive surface exist? Is there persisted state or an externally shared serialized/file/message/protocol contract?
 
-Create a schema-v2 synthetic `greenfield` findings file with the current `run_id`, an empty findings array, and the exact inspected scope. Carry neutral requirement summaries into the in-memory ADR and generated-doc candidates, not into the findings JSON. Never retain secrets, credential-bearing URLs, code blocks, or quoted embedded instructions.
+Create a schema-v3 synthetic `greenfield` findings file with the current `run_id`, an empty findings array, and the exact inspected scope. Carry neutral requirement summaries into the in-memory ADR and generated-doc candidates, not into the findings JSON. Never retain secrets, credential-bearing URLs, code blocks, or quoted embedded instructions.
 
 ## Requirement coverage
 

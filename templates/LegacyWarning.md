@@ -10,3 +10,4 @@
 - Why it's like this for now: <reason>
 - Risk when changing nearby: <what may break>
 - Related: <[[migration_backlog#MB-NNN]], if any>
+<!-- For a deferred choice: - Status: deferred; - Reason: <why>; - Review when: <event>; optional - Review on: YYYY-MM-DD. -->

@@ -13,9 +13,9 @@
 Point it at any Git repository and it will:
 
 1. **Audit** the code with seven read-only specialists (stack, architecture, security, testing, dead weight, plus UI and data when they exist). Every claim comes with a file-and-line receipt, and every serious finding must survive an independent attempt to disprove it.
-2. **Interview you** about the conflicts it found, and record your decisions.
-3. **Generate** one shared context: `PROJECT_CONTEXT.md` at the root plus supporting documents under `repodocs/` — wired into `CLAUDE.md` and `AGENTS.md` so both agents read the same truth (your own content in those files is never touched).
-4. **Open a local dashboard** where you can explore the findings, the project map, every file that instructs an agent, and copy ready-made prompts to fix things.
+2. **Save a report** with coverage, findings and open questions, then open a local read-only dashboard.
+3. **On a separate request, interview you** about findings and accepted rules.
+4. **Generate and connect** one shared `PROJECT_CONTEXT.md` plus supporting `repodocs/` documents for Claude and Codex. Later audits preserve that verified context until you request an update.
 
 It is deliberately technology-neutral: a library, a CLI, a firmware workspace, an infra repo, or a monorepo all work. The skill discovers what your project actually is instead of assuming a web app with a SQL database.
 
@@ -51,28 +51,29 @@ The skill walks you through it from there. A few useful phrases afterwards:
 
 | You say | What happens |
 |---|---|
-| “audit this repository” | Full run: audit → interview → generate → wire → verify → dashboard |
-| “refresh the project context” | Re-audits what changed and regenerates the docs |
-| “open the project context dashboard” | Local read-only dashboard of the last validated run |
+| “audit this repository” | Saves findings, coverage, report and dashboard; no policy or host writes |
+| “generate and connect project context” | Confirms decisions, generates policy, verifies, and connects enabled hosts |
+| “refresh the project context” | Re-audits affected areas and previews any proposed policy update |
+| “open the project context dashboard” | Local read-only dashboard of the latest audit and connected context |
 | “check this diff against the project docs” | Reviews a branch/PR against your recorded rules |
 | “update the project-context skill” | Self-update to the latest release |
 
-Empty repository? That works too — the audit is replaced by a short requirements interview, and the generated docs become the plan your first PRs are reviewed against.
+Empty repository? The first audit records requirements and open questions. It does not invent code defects or connect context.
 
 ## What you get in your repository
 
 ```text
-PROJECT_CONTEXT.md            # the one document both agents read
-CLAUDE.md / AGENTS.md         # your files; the skill only adds a small managed block
+PROJECT_CONTEXT.md            # created only when you request shared context
+CLAUDE.md / AGENTS.md         # managed blocks added only with connected context
 repodocs/                     # everything generated lives here, never in your docs/
   decisions.md                # your accepted decisions (ADRs) — the source of truth
   techstack.md, architecture.md, security.md, testing.md, edge-cases.md, ...
   LegacyWarning.md            # honest list of what does not match the target yet
   migration-backlog.md        # ordered plan to get there
-  audit/                      # findings with evidence, run history, drift report
+  audit/                      # reports, findings with evidence, run history, drift report
 ```
 
-The documents describe the **target** state you chose; the gap between target and today lives in `LegacyWarning.md` and the backlog, so nothing gets silently rewritten.
+An audit-only repository has just the config, audit report, findings, inventory and manifest. Connected documents describe the **target** state you chose; new findings remain pending until you decide whether to change policy.
 
 ## The dashboard
 
@@ -80,7 +81,7 @@ After a successful run the skill opens a local, read-only dashboard (or ask for 
 
 - **Monitor** — validation state, auditor coverage, and the items that need attention first;
 - **Remediate** — every finding with original and effective severity, plus copyable agent prompts (per finding, a master prompt for a selection, or a vendor-neutral task list for your tracker);
-- **Explore** — an interactive project map and an inventory of **every file that instructs an agent** in your repo: who reads it, duplicates across hosts, and whether its links still resolve;
+- **Explore** — an interactive project map, bounded plain-text previews of manifest-owned documents, and an inventory of files that instruct agents. Host configuration contents are withheld;
 - **Govern** — decisions, technical debt, audit history, and integrity checks.
 
 It binds to localhost, never executes your code, never calls the network, and never dresses up a number: stale is shown as stale, unscanned as unscanned.
@@ -91,7 +92,7 @@ It binds to localhost, never executes your code, never calls the network, and ne
 - Auditors are **read-only** and treat all repository content — including text addressed to AI agents — as untrusted data, never as instructions.
 - Nothing irreversible happens without asking you first; previews come before writes.
 - Secrets found during the audit are reported by location and type, **never by value**. The dashboard withholds host-configuration file contents for the same reason.
-- Every serious finding is independently challenged before you see it, and fresh blind verifiers check the generated docs without seeing the findings — repeatedly, under a hard depth bound. A run that cannot satisfy the verifiers is recorded as **failed**, never rounded up to passed; we know, because [the skill audits itself before every release](RELEASING.md) and has failed its own gate honestly.
+- Every serious finding is independently challenged. When context is generated, fresh blind verifiers check its documents for at most eight passes. Document verification failure is visible separately from audit coverage.
 
 ## Requirements
 
@@ -102,14 +103,7 @@ It binds to localhost, never executes your code, never calls the network, and ne
 <details>
 <summary><b>Team / project installation (pin the skill inside the repository)</b></summary>
 
-Pin the skill as a submodule so the whole team runs the same version. From the exact Git root:
-
-```bash
-mkdir -p .agents/skills .claude/skills/project-context
-git submodule add https://github.com/r00tbear/project-context-skill.git .agents/skills/project-context
-git -C .agents/skills/project-context checkout "$(git -C .agents/skills/project-context describe --tags --abbrev=0)"
-cp .agents/skills/project-context/templates/host/claude-skill-adapter.md .claude/skills/project-context/SKILL.md
-```
+Pin the skill as a submodule at `.agents/skills/project-context` so the team runs the same release. Before adding it, check every existing component of that path and of `.claude/skills/project-context/SKILL.md` for symlinks or junctions, including backup destinations. Archive collisions first. Add the submodule at a release tag, then copy its `templates/host/claude-skill-adapter.md` to a temporary file beside the adapter target. Recheck the paths and atomically replace `SKILL.md`; abort on any failed check. The personal installers show the platform-specific path guards and replacement sequence.
 
 Commit `.gitmodules`, the submodule gitlink, and the adapter. New clones initialize it with:
 
@@ -117,25 +111,16 @@ Commit `.gitmodules`, the submodule gitlink, and the adapter. New clones initial
 git submodule update --init -- .agents/skills/project-context
 ```
 
-Do not keep a personal copy at the same time — Claude gives personal skills precedence, which silently defeats the pinned version. Before writing, check for symlinks with `find -P .agents .claude -type l -print` and stop if any appear.
+Do not keep a personal copy at the same time — Claude gives personal skills precedence, which silently defeats the pinned version. Do not use a direct `cp` over an existing adapter or follow a linked path.
 
 </details>
 
 <details>
 <summary><b>Manual installation (what the one-liner does)</b></summary>
 
-```bash
-mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills/project-context"
-git clone --branch <latest-tag> --depth 1 \
-  https://github.com/r00tbear/project-context-skill.git \
-  "$HOME/.agents/skills/project-context"
-cp "$HOME/.agents/skills/project-context/templates/host/claude-skill-adapter.md" \
-  "$HOME/.claude/skills/project-context/SKILL.md"
-```
+Use the reviewed [POSIX installer](install.sh) or [PowerShell installer](install.ps1) as the manual procedure: read it, pin `PROJECT_CONTEXT_VERSION` to the desired tag, and run it locally. It checks all destination and backup components before mutation and again before each write, then replaces the adapter atomically. An abbreviated `mkdir; git clone; cp` sequence omits those guards. The canonical payload lives under `.agents` (Codex discovers it directly); `.claude` holds only a small adapter pointing at it. With a custom `CLAUDE_CONFIG_DIR`, use a guarded project installation instead so the relative path stays stable.
 
-The canonical payload lives under `.agents` (Codex discovers it directly); `.claude` holds only a small adapter pointing at it. This layout assumes the default `~/.claude`; with a custom `CLAUDE_CONFIG_DIR`, use the project installation instead so the relative path stays stable.
-
-On Windows the same layout lives under `%USERPROFILE%\.agents` and `%USERPROFILE%\.claude`; run the steps above in Git Bash, or use the PowerShell installer which handles the paths for you.
+On Windows the same layout lives under `%USERPROFILE%\.agents` and `%USERPROFILE%\.claude`; use the PowerShell installer for junction checks and atomic adapter replacement.
 
 </details>
 
@@ -158,7 +143,7 @@ One canonical payload, one canonical context. The skill never creates lowercase 
 <details>
 <summary><b>Upgrading across major versions</b></summary>
 
-Releases are immutable tags; [CHANGELOG.md](CHANGELOG.md) states per release whether generated context must be re-applied. Re-running the installer (or asking your agent to update) moves you to the latest release. A patch release only warns; a minor/major release makes an old project report its context as invalid — that is the signal to re-run the audit, which regenerates everything and re-asks only what changed. Your accepted decisions are carried into the new interview, not thrown away. Details: [references/upgrade.md](references/upgrade.md).
+Releases are immutable tags; [CHANGELOG.md](CHANGELOG.md) states whether regeneration is required. v0.6.0 archives v0.5.x artifacts and starts a new audit history. Confirmed decisions help the new interview; source-cited ADR/MB IDs remain reserved. Details: [references/upgrade.md](references/upgrade.md).
 
 </details>
 

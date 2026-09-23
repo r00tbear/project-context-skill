@@ -25,12 +25,34 @@ function Quiet([scriptblock]$Command) {
     try { & $Command 2>$null } finally { $ErrorActionPreference = $Previous }
 }
 
+function Assert-InstallPath([string]$Path) {
+    $HomeFull = [System.IO.Path]::GetFullPath($HomeDir).TrimEnd([char[]]@('\', '/'))
+    $Full = [System.IO.Path]::GetFullPath($Path)
+    $Prefix = $HomeFull + [System.IO.Path]::DirectorySeparatorChar
+    if ($Full -ne $HomeFull -and -not $Full.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Fail "path is outside the selected home: $Path"
+    }
+    $Current = [System.IO.Path]::GetPathRoot($Full)
+    $Parts = $Full.Substring($Current.Length).Split(
+        [char[]]@('\', '/'), [System.StringSplitOptions]::RemoveEmptyEntries)
+    foreach ($Part in @('') + $Parts) {
+        if ($Part) { $Current = Join-Path $Current $Part }
+        $Item = Get-Item -LiteralPath $Current -Force -ErrorAction SilentlyContinue
+        if ($Item -and ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            Fail "refusing a symlink or junction in install path: $Current"
+        }
+    }
+}
+
 $RepoUrl = if ($env:PROJECT_CONTEXT_REPO) { $env:PROJECT_CONTEXT_REPO } else { "https://github.com/r00tbear/project-context-skill.git" }
 $HomeDir = if ($env:PROJECT_CONTEXT_HOME) { $env:PROJECT_CONTEXT_HOME } else { $HOME }
 $Payload = Join-Path $HomeDir ".agents\skills\project-context"
 $AdapterDir = Join-Path $HomeDir ".claude\skills\project-context"
 $Backups = Join-Path $HomeDir ".skill-backups"
-$Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$Stamp = (Get-Date -Format "yyyyMMdd-HHmmss") + "-$PID"
+$LegacyCodex = Join-Path $HomeDir ".codex\skills\project-context"
+$ClaudeBackup = Join-Path $Backups "claude-project-context-$Stamp"
+$CodexBackup = Join-Path $Backups "codex-project-context-$Stamp"
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Fail "git is required. Install it first: https://git-scm.com/downloads"
@@ -58,19 +80,29 @@ if (-not $Version) {
 if (-not $Version) { Fail "could not resolve a release tag from $RepoUrl" }
 Say "installing release $Version"
 
+foreach ($Path in @($Payload, (Join-Path $Payload ".git"), $AdapterDir,
+    (Join-Path $AdapterDir "SKILL.md"), $Backups, $ClaudeBackup, $CodexBackup, $LegacyCodex)) {
+    Assert-InstallPath $Path
+}
+if ((Test-Path $ClaudeBackup) -or (Test-Path $CodexBackup)) { Fail "backup destination already exists; re-run the installer" }
+
 # Archive a legacy full copy living where the small adapter belongs (v0.1/v0.2 layouts).
 if ((Test-Path $AdapterDir) -and ((Test-Path (Join-Path $AdapterDir "auditors")) -or (Test-Path (Join-Path $AdapterDir ".git")))) {
+    Assert-InstallPath $AdapterDir
+    Assert-InstallPath $Backups
     New-Item -ItemType Directory -Force -Path $Backups | Out-Null
-    Move-Item $AdapterDir (Join-Path $Backups "claude-project-context-$Stamp")
+    Move-Item $AdapterDir $ClaudeBackup
     Say "archived the old copy from .claude\skills\project-context to .skill-backups\claude-project-context-$Stamp"
 }
-$LegacyCodex = Join-Path $HomeDir ".codex\skills\project-context"
 if (Test-Path $LegacyCodex) {
+    Assert-InstallPath $LegacyCodex
+    Assert-InstallPath $Backups
     New-Item -ItemType Directory -Force -Path $Backups | Out-Null
-    Move-Item $LegacyCodex (Join-Path $Backups "codex-project-context-$Stamp")
+    Move-Item $LegacyCodex $CodexBackup
     Say "archived the old copy from .codex\skills\project-context to .skill-backups\codex-project-context-$Stamp"
 }
 
+Assert-InstallPath (Join-Path $Payload ".git")
 if (Test-Path (Join-Path $Payload ".git")) {
     $Origin = Quiet { git -C $Payload remote get-url origin }
     if ($Origin -notlike "*project-context-skill*") {
@@ -84,6 +116,7 @@ if (Test-Path (Join-Path $Payload ".git")) {
 } elseif (Test-Path $Payload) {
     Fail "$Payload exists and is not a git clone. Move it aside and re-run."
 } else {
+    Assert-InstallPath $Payload
     New-Item -ItemType Directory -Force -Path (Split-Path $Payload) | Out-Null
     Quiet { git -c advice.detachedHead=false clone --quiet --branch $Version --depth 1 $RepoUrl $Payload }
     if ($LASTEXITCODE -ne 0) {
@@ -92,8 +125,25 @@ if (Test-Path (Join-Path $Payload ".git")) {
     }
 }
 
+Assert-InstallPath $AdapterDir
+$AdapterTarget = Join-Path $AdapterDir "SKILL.md"
+Assert-InstallPath $AdapterTarget
+$AdapterSource = Join-Path $Payload "templates\host\claude-skill-adapter.md"
+Assert-InstallPath $AdapterSource
 New-Item -ItemType Directory -Force -Path $AdapterDir | Out-Null
-Copy-Item (Join-Path $Payload "templates\host\claude-skill-adapter.md") (Join-Path $AdapterDir "SKILL.md") -Force
+if (Test-Path $AdapterTarget -PathType Container) { Fail "adapter target is a directory" }
+$AdapterTemp = Join-Path $AdapterDir (".SKILL.md." + [System.Guid]::NewGuid().ToString("N") + ".tmp")
+try {
+    [System.IO.File]::WriteAllBytes($AdapterTemp, [System.IO.File]::ReadAllBytes($AdapterSource))
+    Assert-InstallPath $AdapterTarget
+    if (Test-Path $AdapterTarget) {
+        [System.IO.File]::Replace($AdapterTemp, $AdapterTarget, $null)
+    } else {
+        [System.IO.File]::Move($AdapterTemp, $AdapterTarget)
+    }
+} finally {
+    if (Test-Path $AdapterTemp) { Remove-Item -LiteralPath $AdapterTemp -Force }
+}
 
 # jCodeMunch: the local, offline code index the skill audits through. Required.
 if ($env:PROJECT_CONTEXT_NO_JCODEMUNCH -eq "1") {

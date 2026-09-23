@@ -1,8 +1,8 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "runs": [
     {
-      "id": "audit-<UTC timestamp>-<suffix>",
+      "id": "audit-20260101T000000Z-template",
       "scanned_at": "2026-01-01T00:00:00Z",
       "revision": null,
       "worktree_clean": null,
@@ -11,24 +11,14 @@
       "domains": {"ui": "absent", "data": "absent"},
       "coverage": {
         "required": ["stack", "architecture", "bloat", "security", "testing"],
-        "completed": ["stack", "architecture", "bloat", "security", "testing"],
-        "skipped": {
-          "ui": "No user-facing interactive surface was found.",
-          "data": "No persisted state or externally shared data contract was found."
-        },
+        "completed": [],
+        "skipped": {"ui": "No interactive surface.", "data": "No persisted or shared data contract."},
         "failed": []
       },
-      "scope": {
-        "included": ["."],
-        "excluded": ["repodocs"],
-        "unscanned": ["vendor/generated-client"],
-        "limitations": [
-          "Tool and method limitations belong here as prose, never in the path lists above.",
-          "Example: the code index parser does not cover Bash or TOML; those files were read directly."
-        ]
-      },
+      "scope": {"included": ["."], "excluded": ["repodocs"], "unscanned": []},
       "tools": {"jcodemunch": "skipped"},
-      "verification": {"blind": "not-run", "issues": 0}
+      "verification": {"blind": "not-run", "issues": 0},
+      "results": {}
     }
   ]
 }

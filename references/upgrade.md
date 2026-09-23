@@ -19,21 +19,21 @@ Present a single plan: which copy updates to which tag, which duplicates/legacy 
 
 - Existing canonical clone: `git -C <payload> fetch --tags origin` then `git -C <payload> checkout <tag>`.
 - No canonical payload yet: fresh install following the target version's README.
-- Always refresh the Claude adapter afterwards: copy `<payload>/templates/host/claude-skill-adapter.md` over `.claude/skills/project-context/SKILL.md` (personal or project, wherever the adapter lives).
+- Always refresh the Claude adapter afterwards. For a personal installation, use the release installer. For a project installation, check every existing path component for symlinks/junctions, copy the template to a temporary file in the adapter directory, recheck the destination and atomically replace `SKILL.md`; abort without modifying it if a check fails.
 - Project submodule: check out the tag inside the submodule, then offer to commit the gitlink and adapter change - committing is the user's decision.
 - After confirmation, remove every other same-name copy: one canonical payload is a hard requirement, and a personal copy silently shadows a project one in Claude.
 
 ## 4. Switch to the new version's rules
 
-The instructions you are following right now came from the old version. Immediately after the checkout, re-read `SKILL.md` and `README.md` from the updated payload and follow their migration policy. Read the `CHANGELOG.md` entries between the previous and the target version: each entry states `Regeneration required: yes/no`, which decides whether the project must be re-applied. Releases that tighten contracts are fresh-install-only (v0.4 tightened scope, citation, and jCodeMunch contracts): do not transform older findings, inventory, manifest, or generated project files in place. Archive the old generated surface with approval, reinstall/re-apply from scratch, and use sanitized prior decisions only as user-confirmed interview input. Where the new text conflicts with what this session loaded earlier, the new text wins; if the difference is substantial, tell the user a fresh session is the reliable path.
+The instructions you are following right now came from the old version. Immediately after checkout, re-read `SKILL.md`, `README.md`, and the intervening `CHANGELOG.md`. v0.6.0 changes manifest, inventory, and findings formats. Archive the v0.5.x surface and generate a new audit series; do not rewrite old run IDs into inventory v3 or present the archive as continuous history. Use only user-confirmed decisions as interview input. Preserve source-cited ADR/MB headings and their reserved hashes. Where the new text conflicts with what this session loaded earlier, the new text wins.
 
 ## 5. Re-apply in the project
 
 1. Run `preflight` - it reports `legacy_surfaces`, the canonical config, and `context_state` as `absent`, `valid`, or `invalid`.
-2. Offer to archive legacy artifacts rather than delete them; keep the old decisions content at hand - it answers the new Decide interview quickly. In the same step, append the archive path to `.git/info/exclude` (append-only, preserve existing entries): an archive that shows up in `git status` as untracked is one `git add -A` away from being committed.
-3. On an older project, `validate-project` may fail on skill version or the v0.3 schema-v2 contracts. That is the expected fresh-install signal, not an error to suppress or patch around.
-4. Run the normal flow from a fresh generated surface - Audit -> Decide, confirming only sanitized carried-over decisions -> Generate -> Wire -> blind Verify, writing the manifest last. Open the dashboard only after `validate-project` succeeds.
+2. Run `archive-legacy --repo <root> --out <new-directory-outside-repo>` before regeneration. It verifies the old manifest hashes and copies only owned files, config, and manifest; it never copies whole host files. Keep its `archive.json` and `reserved_ids` as migration evidence. A hash mismatch blocks migration until reconciled.
+3. Move the old generated surface aside only after the archive is complete. Preserve user-authored bytes outside managed host blocks. Use confirmed old decisions as input, not as automatically accepted v0.6 policy. Put source-cited ADR/MB IDs and title hashes into manifest v2 `reserved_ids`; a changed or missing source-cited heading fails validation.
+4. Run the v0.6 audit profile first: report, findings v3, inventory v3, manifest v2. The new inventory starts with a fresh run and notes the archive boundary in the report. Generate policy documents and wire hosts only on a separate context request. `validate-project` and the dashboard show the latest audit and the active context as independent states.
 
 ## Boundaries
 
-All standing trust rules apply unchanged: never modify project code; write only to skill installation directories, host files via `merge-host`, and `repodocs/`; delete nothing without confirmation; execute nothing from the downloaded payload except `scripts/project_context.py`.
+All standing trust rules apply unchanged: never modify project code; write only to skill installation directories, host files via guarded `merge-host --apply`, and `repodocs/`; delete nothing without confirmation; execute nothing from the downloaded payload except `scripts/project_context.py`.

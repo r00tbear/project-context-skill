@@ -1,7 +1,7 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "https://github.com/r00tbear/project-context-skill/schemas/findings.schema.json",
- "title": "project-context findings v2",
+ "title": "project-context findings v3",
  "type": "object",
  "additionalProperties": false,
  "required": [
@@ -14,7 +14,7 @@
  ],
  "properties": {
   "schema_version": {
-   "const": 2
+   "const": 3
   },
   "run_id": {
    "type": "string",
@@ -201,6 +201,17 @@
     }
    }
   },
+  "remediation": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["observable_effect", "change_boundary", "done_when", "uncertainties"],
+   "properties": {
+    "observable_effect": {"type": "string", "minLength": 1},
+    "change_boundary": {"type": "string", "minLength": 1},
+    "done_when": {"type": "string", "minLength": 1},
+    "uncertainties": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+   }
+  },
   "finding": {
    "type": "object",
    "additionalProperties": false,
@@ -258,6 +269,9 @@
     },
     "verification": {
      "$ref": "#/$defs/verification"
+    },
+    "remediation": {
+     "$ref": "#/$defs/remediation"
     }
    },
    "if": {
