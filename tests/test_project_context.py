@@ -2079,7 +2079,7 @@ class DashboardTests(unittest.TestCase):
             "validate-findings --input <candidate-findings.json> --previous <saved-previous-findings.json>",
             "validate-inventory --input <candidate-inventory.json> --previous <saved-previous-inventory.json>",
             "untouched auditor results with original run IDs and hashes",
-            "A fresh read-only agent must perform blind verification",
+            "A fresh read-only agent must blind-check the candidate audit",
             "findings, trace ledger, decision rationale",
             "write the manifest last",
         ):
@@ -2184,13 +2184,15 @@ class DashboardTests(unittest.TestCase):
         )
         command_order = [
             "validate-findings --input <candidate-findings.json>",
-            "validate-project-map --input <candidate-project-map.json>",
             "validate-inventory --input <post-blind-candidate-inventory.json>",
             "validate-manifest --input <candidate-manifest.json>",
             "validate-project --repo <exact-root>",
         ]
         positions = [master_source.index(command) for command in command_order]
         self.assertEqual(positions, sorted(positions))
+        self.assertNotIn(
+            "validate-project-map --input <candidate-project-map.json>", master_source
+        )
 
     def test_project_graph_snapshot_preserves_adversarial_topology_safely(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
