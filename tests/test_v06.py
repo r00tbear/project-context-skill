@@ -559,6 +559,7 @@ class V06Tests(unittest.TestCase):
             }
             self.assertEqual(inventory["runs"][0]["id"], source_runs["audit_report"])
             self.assertEqual(run["id"], source_runs["audit_report_two"])
+            self.assertEqual(run["id"], source_runs["audit_inventory"])
             self.assertEqual(
                 inventory["runs"][0]["id"], source_runs["finding_architecture"]
             )
