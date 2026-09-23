@@ -18,6 +18,7 @@ from scripts.project_context import (
     sha256_bytes,
     sha256_text,
     task_brief,
+    validate_findings,
     validate_inventory,
     validate_manifest,
     validate_project,
@@ -224,6 +225,70 @@ def fixture(root, *, greenfield=False, context=False):
 
 
 class V06Tests(unittest.TestCase):
+    def test_performance_auditor_preserves_older_runs_and_completes_new_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inventory, manifest = fixture(root)
+            self.assertEqual("audit", validate_project(root)["profile"])
+
+            run = inventory["runs"][0]
+            run["coverage"]["required"].append("performance")
+            with self.assertRaisesRegex(ContractError, "coverage-incomplete"):
+                validate_inventory(inventory)
+            run["outcome"] = "coverage-incomplete"
+            validate_inventory(inventory)
+
+            document = json.loads(
+                (root / "repodocs/audit/findings/architecture.json").read_text()
+            )
+            document["auditor"] = "performance"
+            row = document["findings"][0]
+            row["id"] = "performance-001"
+            row["kind"] = "n-plus-one-query"
+            row["title"] = "One query per list item"
+            row["identity"]["assertion"] = "list processing reads each item separately"
+            row["evidence"][0]["detail"] = "Synthetic query fan-out."
+            row["remediation"].update(
+                observable_effect="One read per list item.",
+                done_when="The item count does not multiply reads.",
+            )
+            validate_findings(document)
+            schema = json.loads((ROOT / "schemas/findings.schema.json").read_text())
+            self.assertIn("performance", schema["$defs"]["auditor"]["enum"])
+            findings_path = root / "repodocs/audit/findings/performance.json"
+            write_json(findings_path, document)
+            findings_hash = sha256_text(findings_path.read_text())
+            manifest["artifacts"].append(
+                {
+                    "id": "finding_performance",
+                    "path": "repodocs/audit/findings/performance.json",
+                    "kind": "owned_file",
+                    "sha256": findings_hash,
+                }
+            )
+            run["coverage"]["completed"].append("performance")
+            run["results"]["performance"] = copy.deepcopy(run["results"]["testing"])
+            run["results"]["performance"]["sha256"] = findings_hash
+            run["outcome"] = "complete"
+            validate_inventory(inventory)
+            inventory_path = root / "repodocs/audit/inventory.json"
+            write_json(inventory_path, inventory)
+            next(
+                item
+                for item in manifest["artifacts"]
+                if item["id"] == "audit_inventory"
+            )["sha256"] = sha256_text(inventory_path.read_text())
+            write_json(root / "repodocs/project-context.manifest.json", manifest)
+
+            self.assertEqual("audit", validate_project(root)["profile"])
+            snapshot = dashboard_snapshot(root)
+            self.assertIn(
+                "performance", snapshot["audit"]["latest"]["coverage"]["completed"]
+            )
+            self.assertTrue(
+                any(row["id"] == "performance-001" for row in snapshot["findings"])
+            )
+
     def test_audit_to_context_requires_explicit_regeneration(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

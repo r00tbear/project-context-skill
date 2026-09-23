@@ -6,6 +6,13 @@ enforces this by `(major, minor)` of the recorded skill version: a patch delta i
 warning, a minor/major delta reports `context_state: invalid` until the audit is re-run.
 Before v0.5.0 the check was strict: any version delta invalidated the context.
 
+## v0.6.1
+
+**Regeneration required: no** (additive performance auditor; existing v3 audit and context artifacts remain valid).
+
+- New codebase audits include a read-only performance reviewer for N+1 and repeated queries, query shape, I/O fan-out, and other evidenced resource costs. The reviewer distinguishes measured counts from static bounds and does not invent database concerns.
+- The dashboard auditor filter includes completed reviewers even when they found nothing. Historical v3 runs without performance retain their original coverage; a new audit records performance explicitly.
+
 ## v0.6.0
 
 **Regeneration required: yes** (manifest v2, inventory v3, findings v3). Archive the v0.5.x surface with `archive-legacy`, then start a new audit series. Confirmed decisions can seed regeneration; source-cited ADR/MB headings are reserved.

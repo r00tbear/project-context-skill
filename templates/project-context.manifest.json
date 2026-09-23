@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "skill_version": "0.6.0",
+  "skill_version": "0.6.1",
   "profile": "audit",
   "context_run_id": null,
   "reserved_ids": [],

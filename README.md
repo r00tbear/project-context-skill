@@ -12,7 +12,7 @@
 
 Point it at any Git repository and it will:
 
-1. **Audit** the code with seven read-only specialists (stack, architecture, security, testing, dead weight, plus UI and data when they exist). Every claim comes with a file-and-line receipt, and every serious finding must survive an independent attempt to disprove it.
+1. **Audit** the code with six core read-only specialists (stack, architecture, performance, security, testing, dead weight), plus UI and data when they exist. The performance review traces N+1 and repeated queries, query shape, I/O fan-out, and other evidenced resource costs. Every claim comes with a file-and-line receipt, and every serious finding must survive an independent attempt to disprove it.
 2. **Save a report** with coverage, findings and open questions, then open a local read-only dashboard.
 3. **On a separate request, interview you** about findings and accepted rules.
 4. **Generate and connect** one shared `PROJECT_CONTEXT.md` plus supporting `repodocs/` documents for Claude and Codex. Later audits preserve that verified context until you request an update.

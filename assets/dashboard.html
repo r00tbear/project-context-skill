@@ -3404,8 +3404,12 @@
         findingRows.length = 0;
         selectedFindingIds.clear();
 
-        const auditors = [...new Set(findings.map((finding) => asText(finding.auditor)).filter(Boolean))].sort();
+        const auditors = [...new Set([
+          ...asArray(asObject(latestAudit.coverage).completed),
+          ...findings.map((finding) => finding.auditor)
+        ].map((auditor) => asText(auditor)).filter(Boolean))].sort();
         const auditorFilter = byId("auditor-filter");
+        auditorFilter.length = 1;
         auditors.forEach((auditor) => {
           const option = make("option", "", titleCase(auditor));
           option.value = auditor;

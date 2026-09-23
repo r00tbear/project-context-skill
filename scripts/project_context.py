@@ -29,6 +29,7 @@ AUDITORS = {
     "ui",
     "data",
     "bloat",
+    "performance",
     "security",
     "testing",
     "greenfield",
@@ -67,7 +68,7 @@ SEVERITIES = {"low", "medium", "high", "critical"}
 SEVERITY_RANK = {
     name: rank for rank, name in enumerate(("low", "medium", "high", "critical"))
 }
-CORE_AUDITORS = {"stack", "architecture", "bloat", "security", "testing"}
+BASE_AUDITORS = {"stack", "architecture", "bloat", "security", "testing"}
 PROJECT_MAP_KINDS = {"surface", "component", "data", "runtime", "external", "other"}
 PROJECT_MAP_STATUSES = {"current", "planned", "legacy"}
 
@@ -647,7 +648,7 @@ def validate_inventory(value: Any, previous: Any | None = None) -> dict[str, Any
         expected_required = (
             {"greenfield"}
             if run["source_state"] == "greenfield"
-            else CORE_AUDITORS
+            else BASE_AUDITORS
             | {name for name, state in domains.items() if state == "enabled"}
         )
         if set(required) != expected_required:
@@ -789,7 +790,8 @@ def _validate_inventory_v3(
         expected_required = (
             {"greenfield"}
             if source_state == "greenfield"
-            else CORE_AUDITORS
+            else BASE_AUDITORS
+            | ({"performance"} if "performance" in required else set())
             | {name for name, state in domains.items() if state == "enabled"}
         )
         if (
@@ -4422,6 +4424,7 @@ def self_check(skill_root: Path) -> dict[str, Any]:
             "architecture",
             "bloat",
             "data",
+            "performance",
             "security",
             "stack",
             "testing",

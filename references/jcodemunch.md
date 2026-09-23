@@ -38,6 +38,7 @@ Then route targeted calls by audit topic:
 | UI | `find_similar_symbols` and references inside confirmed interface roots |
 | data | `get_ranked_context` and references around persisted/shared contracts; `search_columns` only when supported |
 | bloat | `get_dead_code_v2`, similarity, references, and `check_delete_safe` |
+| performance | `find_hot_paths` or `get_hotspots` to prioritize, then bounded call hierarchy/references around confirmed query and I/O sites; tool scores are not timings or query counts |
 | security | bounded context/references at evidenced trust boundaries; never secret search |
 | testing | `get_untested_symbols` joined with hotspots/references and exact test evidence |
 | instruction map (Preflight) | `audit_agent_config` for stale-symbol and dead-file-path rows only; each row confirmed by a direct read of the cited config line. Our hash-based duplicate detection stays authoritative; the tool's redundancy/token-cost output is dropped, never a finding |
