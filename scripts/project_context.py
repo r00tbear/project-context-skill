@@ -3876,9 +3876,12 @@ def task_brief(repo: Path, task: str) -> str:
                 ),
             ]
         )
-        testing = project["markdown"].get(
-            "repodocs/testing.md", project["markdown"].get("PROJECT_CONTEXT.md", "")
+        testing_path = (
+            "repodocs/testing.md"
+            if "repodocs/testing.md" in project["markdown"]
+            else "PROJECT_CONTEXT.md"
         )
+        testing = project["markdown"].get(testing_path, "")
         checks = [
             line.strip()
             for line in testing.splitlines()
@@ -3889,7 +3892,7 @@ def task_brief(repo: Path, task: str) -> str:
             [
                 "",
                 "## Checks",
-                *(f"- {quoted(line)} (repodocs/testing.md)" for line in checks),
+                *(f"- {quoted(line)} ({testing_path})" for line in checks),
             ]
         )
     else:

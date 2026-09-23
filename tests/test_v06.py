@@ -520,6 +520,47 @@ class V06Tests(unittest.TestCase):
             brief = task_brief(root, "module responsibilities")
             self.assertIn('ADR-002: review when "New caller appears" (date due)', brief)
 
+    def test_compact_task_brief_links_checks_to_context_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, manifest = fixture(root, context=True)
+            config_path = root / "repodocs/project-context.config.json"
+            config = json.loads(config_path.read_text())
+            config["document_layout"] = "compact"
+            write_json(config_path, config)
+            manifest["config_sha256"] = sha256_text(config_path.read_text())
+            policy_path = root / "PROJECT_CONTEXT.md"
+            policy_path.write_text(
+                "# Compact\n\n"
+                + "\n".join(
+                    f'<a id="{topic}"></a>\n## {topic}\n[[context#{topic}]]\n'
+                    for topic in (
+                        "stack",
+                        "architecture",
+                        "security",
+                        "testing",
+                        "edge-cases",
+                    )
+                )
+                + "\nCheck module responsibilities.\n"
+            )
+            omitted = {"architecture", "techstack", "security", "testing", "edge_cases"}
+            for artifact in manifest["artifacts"]:
+                if artifact["id"] == "context":
+                    artifact["sha256"] = sha256_text(policy_path.read_text())
+                elif artifact["id"] in omitted:
+                    (root / artifact["path"]).unlink()
+            manifest["artifacts"] = [
+                item for item in manifest["artifacts"] if item["id"] not in omitted
+            ]
+            write_json(root / "repodocs/project-context.manifest.json", manifest)
+            self.assertEqual("context", validate_project(root)["profile"])
+            brief = task_brief(root, "module responsibilities")
+            self.assertIn(
+                '"Check module responsibilities." (PROJECT_CONTEXT.md)', brief
+            )
+            self.assertNotIn("(repodocs/testing.md)", brief)
+
     def test_connected_context_survives_new_audit_and_dirty_source_drift(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
